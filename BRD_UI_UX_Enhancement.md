@@ -81,9 +81,11 @@ The GenAI PDF Extractor is a Django-based web application that extracts structur
 
 **Data Visualization:**
 - Structured display of extracted entities using cards, tables, and sections
+- JSON output rendered as categorized, sortable, and filterable structured tables with labeled columns and rows per entity category
 - Visual indicators for extraction confidence levels
 - Comparison view for multiple extractions
-- Export functionality (JSON, CSV, PDF report)
+- Export functionality (JSON, CSV, Excel/XLSX, PDF report)
+- One-click Excel export button to download extraction results as a formatted .xlsx spreadsheet
 
 **User Experience Enhancements:**
 - Drag-and-drop file upload
@@ -166,10 +168,11 @@ The GenAI PDF Extractor is a Django-based web application that extracts structur
 **Acceptance Criteria:**
 - Display extracted entities organized by category (Lender, Borrower, Loan Terms, Location, Person)
 - Use card-based layout with clear visual hierarchy
+- Provide a "Table View" toggle that renders JSON output as structured, sortable tables per entity category (see FR-009)
 - Show confidence scores for each extracted field (if available)
 - Display original PDF in side-by-side view or tabbed interface
 - Provide "Edit" functionality for manual corrections
-- Include "Export" options (JSON, CSV, PDF report)
+- Include "Export" options (JSON, CSV, Excel/XLSX, PDF report) with a prominent "Export to Excel" button (see FR-010)
 - Show extraction metadata (model used, processing time, timestamp)
 - Provide "Process Another Document" quick action
 
@@ -221,6 +224,41 @@ The GenAI PDF Extractor is a Django-based web application that extracts structur
 - Implement empty states with helpful guidance
 - Show loading states for all async operations
 - Provide confirmation dialogs for destructive actions
+
+### FR-009: Structured Table Display of JSON Output
+**Priority:** High  
+**Description:** Render the raw JSON extraction output as structured, human-readable tables organized by entity category so users can quickly scan and verify extracted data without reading raw JSON.
+
+**Acceptance Criteria:**
+- Parse JSON extraction response and render each entity category (Lender, Borrower, Loan Terms, Location, Person) as a dedicated table
+- Each table displays labeled columns (Field Name, Extracted Value) with clear header rows
+- Support nested JSON objects by flattening them into dot-notation field names or expandable sub-rows
+- Tables are sortable by field name and filterable via a quick-search input above the table
+- Provide a toggle to switch between "Card View" (existing card-based layout) and "Table View" for the extracted entities
+- Table cells support inline editing for manual corrections (click-to-edit pattern)
+- Empty or null fields display a visual placeholder (e.g., "--" with muted styling) rather than blank cells
+- Tables are responsive: horizontal scrollable on mobile, full-width on desktop
+- Row striping (alternating background colors) for improved readability
+- Table header remains sticky when scrolling through long entity lists
+- Provide a "Copy Row" action to copy a field's label and value to clipboard
+- Accessible table markup with proper `<thead>`, `<tbody>`, `<th scope>` attributes and ARIA labels
+
+### FR-010: Excel Export of Extraction Results
+**Priority:** High  
+**Description:** Provide a prominent export button that generates and downloads a formatted Excel (.xlsx) spreadsheet containing all extracted entity data from the JSON output.
+
+**Acceptance Criteria:**
+- Display an "Export to Excel" button with a spreadsheet icon on the Results/Output Display Page alongside existing export options (JSON, CSV, PDF)
+- Clicking the button generates a downloadable `.xlsx` file client-side without requiring a server round-trip
+- The Excel file contains one worksheet per entity category (e.g., sheets named "Lender", "Borrower", "Loan Terms", "Location", "Person")
+- Each worksheet includes a header row with column names (Field Name, Extracted Value) styled with bold font, background color (#3B82F6 white text), and frozen pane
+- Data rows are auto-sized to fit content width
+- A summary worksheet named "Overview" is included as the first sheet listing document metadata (filename, model used, processing date, total entities extracted)
+- Currency values are formatted with Excel number format (e.g., `$#,##0.00`) and percentages with `0.00%` format
+- The exported file is named using the pattern `{document_name}_entities_{YYYY-MM-DD}.xlsx`
+- Button shows a brief loading spinner during file generation and a success toast notification upon completion
+- Export handles edge cases: empty categories produce an empty sheet with headers only; special characters in field values are properly escaped
+- Export button is keyboard accessible and includes an ARIA label ("Export extraction results to Excel spreadsheet")
 
 ---
 
@@ -620,9 +658,18 @@ GenAI PDF Extractor
    **Person Information Card:**
    - Name, Role, Contact Information
 
-3. **Export Options**
+3. **Structured Table View**
+   - Toggle switch to alternate between Card View and Table View
+   - Table View renders each entity category as a dedicated sortable table
+   - Columns: Field Name | Extracted Value (with optional Confidence column)
+   - Inline-edit support within table cells
+   - Quick-search filter input above each table
+   - Sticky header rows and alternating row striping
+
+4. **Export Options**
    - Download as JSON button
    - Download as CSV button
+   - **Download as Excel (.xlsx) button** (prominent, with spreadsheet icon)
    - Generate PDF Report button
 
 **Right Panel (40% width):**
@@ -666,7 +713,23 @@ GenAI PDF Extractor
 │ │ Term: 360 months           │  │                      │
 │ └────────────────────────────┘  │                      │
 │                                  │                      │
-│ [📥 Download JSON] [📊 CSV]     │                      │
+│ [Card View | Table View] toggle  │                      │
+│                                  │                      │
+│ Table View (when active):        │                      │
+│ ┌────────────────────────────┐  │                      │
+│ │ Lender Information         │  │                      │
+│ │ [🔍 Filter...]             │  │                      │
+│ │ ┌────────────┬───────────┐ │  │                      │
+│ │ │ Field      │ Value     │ │  │                      │
+│ │ ├────────────┼───────────┤ │  │                      │
+│ │ │ Name       │ ABC Bank  │ │  │                      │
+│ │ │ Address    │ 123 Main  │ │  │                      │
+│ │ │ Phone      │ (555)...  │ │  │                      │
+│ │ └────────────┴───────────┘ │  │                      │
+│ └────────────────────────────┘  │                      │
+│                                  │                      │
+│ [📥 JSON] [📊 CSV]              │                      │
+│ [📗 Export to Excel]             │                      │
 │ [📄 Generate PDF Report]        │                      │
 │                                  │                      │
 │ [← Back to History]              │                      │
@@ -757,8 +820,13 @@ GenAI PDF Extractor
 - [ ] File validation provides immediate feedback
 - [ ] Processing status updates in real-time
 - [ ] Results page displays all extracted entities in organized format
+- [ ] JSON output is rendered as structured, sortable tables per entity category when Table View is active
+- [ ] Toggle between Card View and Table View works seamlessly without data loss
+- [ ] Table View supports inline editing, quick-search filtering, and sticky headers
 - [ ] PDF viewer allows zoom, page navigation, and full-screen
-- [ ] Export functionality works for JSON, CSV formats
+- [ ] Export functionality works for JSON, CSV, and Excel (.xlsx) formats
+- [ ] Excel export generates a multi-sheet workbook with formatted headers, auto-sized columns, and correct number formatting
+- [ ] Excel file downloads with the naming pattern `{document_name}_entities_{date}.xlsx`
 - [ ] Document history displays all processed documents
 - [ ] Search and filter work correctly in history view
 - [ ] Edit functionality allows inline entity corrections
@@ -823,6 +891,13 @@ GenAI PDF Extractor
 
 **Data Visualization:**
 - **Recharts** or **Chart.js** for statistics charts (if needed)
+
+**Structured Table Display:**
+- **TanStack Table (React Table v8)** for headless, sortable, filterable data tables with sticky headers and inline editing support
+
+**Excel Export:**
+- **SheetJS (xlsx)** for client-side Excel file generation (open-source, no server round-trip required)
+- Generates `.xlsx` files with multiple worksheets, styled headers, number formatting, and auto-sized columns
 
 ### 10.2 Integration with Django Backend
 

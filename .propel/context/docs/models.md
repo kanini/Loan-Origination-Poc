@@ -2,20 +2,16 @@
 
 ## UML Models Overview
 
-This document provides comprehensive UML diagrams and architectural models for the GenAI PDF Extractor system. The diagrams visualize the system architecture, component interactions, data flows, and behavioral patterns based on the codebase analysis documented in `codeanalysis.md`.
+This document provides comprehensive visual models representing the GenAI PDF Extractor system architecture and behavior. The diagrams are derived from functional requirements in `spec.md` and architectural decisions in `design.md`. These models serve multiple purposes:
 
-**Purpose**: These diagrams serve as visual documentation to understand:
-- System boundaries and external integrations
-- Component organization and responsibilities
-- Deployment architecture and infrastructure
-- Data flow and transformation processes
-- Dynamic behavior for each use case
-- Data model and entity relationships
+- **System Context Diagram**: Illustrates the system boundary and external interactions with users and LLM services
+- **Component Architecture Diagram**: Details the hybrid React + Django architecture with presentation, business, and data layers
+- **Deployment Architecture Diagram**: Shows the deployment topology for the web application
+- **Data Flow Diagram**: Traces data movement from PDF upload through LLM processing to result display
+- **Logical Data Model (ERD)**: Defines database entities and relationships for document management and extraction results
+- **Use Case Sequence Diagrams**: Provides detailed interaction flows for each use case (UC-001 through UC-004)
 
-**Navigation Guide**:
-- **Architectural Views**: High-level system structure and deployment
-- **Use Case Sequence Diagrams**: Detailed interaction flows for UC-001
-- **Logical Data Model**: Entity relationships and database schema
+These diagrams align with the modernization goals: transforming a minimal single-page Django application into a professional multi-page React SPA with enhanced UI/UX while maintaining backward compatibility with existing backend infrastructure.
 
 ---
 
@@ -23,59 +19,47 @@ This document provides comprehensive UML diagrams and architectural models for t
 
 ### System Context Diagram
 
-This diagram shows the GenAI PDF Extractor system boundary, its primary function (financial entity extraction from PDFs), and interactions with external actors and systems.
-
 ```plantuml
 @startuml System Context
 !define RECTANGLE class
 
-skinparam componentStyle rectangle
-skinparam defaultTextAlignment center
-
-actor "Financial Document\nAnalyst" as Analyst
-rectangle "GenAI PDF Extractor\nSystem" as System {
+skinparam rectangle {
+    BackgroundColor<<external>> LightBlue
+    BackgroundColor<<system>> LightGreen
+    BorderColor Black
 }
 
-cloud "OpenAI API" as OpenAI {
-  component "GPT-3.5-turbo" as GPT
+rectangle "Financial Analyst" as FA <<external>>
+rectangle "System Administrator" as SA <<external>>
+rectangle "QA Engineer" as QA <<external>>
+
+rectangle "GenAI PDF Extractor\nSystem" as System <<system>> {
+    rectangle "React SPA\n(Presentation Layer)" as Frontend
+    rectangle "Django Backend\n(Business Logic)" as Backend
+    rectangle "SQLite Database\n(Data Persistence)" as DB
 }
 
-cloud "Google Cloud AI" as Google {
-  component "Gemini 2.5 Pro" as Gemini
-}
+rectangle "OpenAI GPT API\n(gpt-3.5-turbo)" as OpenAI <<external>>
+rectangle "Google Gemini API\n(2.5-flash)" as Gemini <<external>>
+rectangle "Browser Storage\n(localStorage)" as Browser <<external>>
 
-database "Local File\nSystem" as FileSystem
+FA -down-> Frontend : Upload PDF,\nView Results,\nExport Data
+SA -down-> Backend : Configure Settings,\nMonitor Performance
+QA -down-> Frontend : Test Features,\nValidate Accessibility
 
-Analyst --> System : Upload PDF\n(HTTP POST)
-System --> Analyst : Display Extracted\nEntities (HTML)
-
-System --> OpenAI : Send Text +\nExtraction Prompt\n(HTTPS/REST)
-OpenAI --> System : Return JSON\nEntities
-
-System --> Google : Send Text +\nExtraction Prompt\n(HTTPS/REST)
-Google --> System : Return JSON\nEntities
-
-System --> FileSystem : Store PDF Files\n(media/uploads/)
-System --> FileSystem : Read PDF Content
+Frontend -down-> Backend : API Requests\n(REST/JSON)
+Backend -down-> DB : Store/Retrieve\nDocuments & Results
+Backend -right-> OpenAI : Extract Entities\n(Text → JSON)
+Backend -right-> Gemini : Extract Entities\n(Text → JSON)
+Frontend -up-> Browser : Cache Preferences,\nSession Data
 
 note right of System
-  **Primary Function:**
-  Extract structured financial 
-  loan data from unstructured 
-  PDF documents using LLMs
-  
-  **Technology:**
-  Django 4.2.16 Web Application
-  Python 3.x
-end note
-
-note right of Analyst
-  **Role:**
-  Internal financial analyst
-  processing loan documents
-  
-  **Access:**
-  Unrestricted (no auth)
+  **System Boundary:**
+  - React SPA handles all UI rendering
+  - Django manages file storage, 
+    LLM integration, data persistence
+  - Hybrid architecture maintains
+    backward compatibility
 end note
 
 @enduml
@@ -85,478 +69,714 @@ end note
 
 ### Component Architecture Diagram
 
-This diagram breaks down the system into individual modules and components, showing their responsibilities and communication paths.
-
 ```mermaid
-flowchart TB
-    subgraph Frontend["Presentation Layer"]
-        UI[HTML Template<br/>index.html]
-        Form[Upload Form<br/>UploadForm]
+flowchart LR
+    subgraph Frontend["Presentation Layer (React SPA)"]
+        direction TB
+        Router["React Router\n(Client-Side Routing)"]
+        Dashboard["Dashboard\nComponent"]
+        Upload["Upload Workflow\nComponent"]
+        Results["Results Display\nComponent"]
+        History["Document History\nComponent"]
+        
+        Router --> Dashboard
+        Router --> Upload
+        Router --> Results
+        Router --> History
+        
+        subgraph UIComponents["Shared UI Components"]
+            Navigation["Navigation Bar"]
+            FileUpload["Drag-Drop Upload\n(react-dropzone)"]
+            PDFViewer["PDF Viewer\n(react-pdf)"]
+            DataTable["Data Table\n(TanStack Table)"]
+            ExportModule["Export Module\n(SheetJS)"]
+        end
+        
+        subgraph StateManagement["State Management"]
+            ReactQuery["React Query\n(Server State)"]
+            LocalStorage["localStorage\n(User Preferences)"]
+        end
+        
+        Dashboard --> UIComponents
+        Upload --> UIComponents
+        Results --> UIComponents
+        History --> UIComponents
+        
+        UIComponents --> StateManagement
     end
     
-    subgraph Backend["Business Layer - Django Application"]
-        View[View Controller<br/>extract_view]
-        PDFExtractor[PDF Text Extractor<br/>extract_text_from_pdf]
-        LLMOrchestrator[LLM Orchestrator<br/>extract_entities_from_model]
+    subgraph Backend["Business Layer (Django)"]
+        direction TB
+        DRF["Django REST Framework\n(API Layer)"]
         
-        subgraph LLMBackends["LLM Backend Abstraction (Unused)"]
-            OpenAIBackend[OpenAI Backend<br/>OpenAIBackend class]
-            GeminiBackend[Gemini Backend<br/>GeminiBackend class]
+        subgraph Views["ViewSets"]
+            DocumentView["DocumentViewSet"]
+            ExtractionView["ExtractionResultViewSet"]
         end
+        
+        subgraph Services["Business Logic"]
+            PDFProcessor["PDF Text Extractor"]
+            LLMIntegrator["LLM Integration Service"]
+            OpenAIBackend["OpenAI Backend"]
+            GeminiBackend["Gemini Backend"]
+        end
+        
+        DRF --> Views
+        Views --> Services
+        LLMIntegrator --> OpenAIBackend
+        LLMIntegrator --> GeminiBackend
     end
     
     subgraph Data["Data Layer"]
-        FileStorage[Local File Storage<br/>media/uploads/]
-        DB[(SQLite Database<br/>db.sqlite3<br/>No models defined)]
+        direction TB
+        ORM["Django ORM"]
+        
+        subgraph Models["Data Models"]
+            Document["Document Model"]
+            ExtractionResult["ExtractionResult Model"]
+            EntityEdit["EntityEdit Model"]
+            UserPreference["UserPreference Model"]
+        end
+        
+        FileStorage["File Storage\n(media/uploads/)"]
+        Database["SQLite Database"]
+        
+        ORM --> Models
+        Models --> Database
+        Document --> FileStorage
     end
+    
+    Frontend -->|"HTTP/REST\n(JSON)"| Backend
+    Backend --> Data
     
     subgraph External["External Services"]
-        OpenAI[OpenAI API<br/>GPT-3.5-turbo]
-        Gemini[Google Gemini API<br/>gemini-2.5-pro]
+        OpenAI["OpenAI API\n(GPT-3.5-turbo)"]
+        Gemini["Google Gemini API\n(2.5-flash)"]
     end
     
-    UI --> Form
-    Form --> View
-    View --> PDFExtractor
-    View --> LLMOrchestrator
-    View --> FileStorage
+    OpenAIBackend -->|"API Request\n(Text)"| OpenAI
+    GeminiBackend -->|"API Request\n(Text)"| Gemini
+    OpenAI -->|"JSON Response\n(Entities)"| OpenAIBackend
+    Gemini -->|"JSON Response\n(Entities)"| GeminiBackend
     
-    PDFExtractor --> FileStorage
-    LLMOrchestrator --> OpenAI
-    LLMOrchestrator --> Gemini
+    classDef frontendStyle fill:#E3F2FD,stroke:#1976D2,stroke-width:2px
+    classDef backendStyle fill:#E8F5E9,stroke:#388E3C,stroke-width:2px
+    classDef dataStyle fill:#FFF3E0,stroke:#F57C00,stroke-width:2px
+    classDef externalStyle fill:#F3E5F5,stroke:#7B1FA2,stroke-width:2px
     
-    OpenAIBackend -.->|Not Used| OpenAI
-    GeminiBackend -.->|Not Used| Gemini
-    
-    View --> UI
-    
-    style LLMBackends fill:#f9f,stroke:#333,stroke-dasharray: 5 5
-    style OpenAIBackend fill:#fdd,stroke:#333,stroke-dasharray: 5 5
-    style GeminiBackend fill:#fdd,stroke:#333,stroke-dasharray: 5 5
-    style DB fill:#ddd,stroke:#333,stroke-dasharray: 5 5
-    
-    classDef external fill:#e1f5ff,stroke:#01579b
-    class OpenAI,Gemini external
+    class Frontend,Router,Dashboard,Upload,Results,History,UIComponents,StateManagement frontendStyle
+    class Backend,DRF,Views,Services backendStyle
+    class Data,ORM,Models,FileStorage,Database dataStyle
+    class External,OpenAI,Gemini externalStyle
 ```
-
-**Component Responsibilities:**
-
-| Component | Responsibility | Technology |
-|-----------|---------------|------------|
-| HTML Template | Render upload form and display results | Django Templates |
-| Upload Form | Handle multipart file upload | Django Forms |
-| View Controller | Orchestrate request handling, file saving, extraction | Django Views |
-| PDF Text Extractor | Extract raw text from PDF documents | PyMuPDF (fitz) |
-| LLM Orchestrator | Route requests to OpenAI or Gemini, handle responses | OpenAI SDK, Google GenAI SDK |
-| Local File Storage | Persist uploaded PDF files | Filesystem (media/) |
-| SQLite Database | Data persistence (currently unused) | SQLite 3.x |
-| LLM Backend Abstraction | Strategy pattern for swappable LLM providers (unused) | Custom Python classes |
 
 ---
 
 ### Deployment Architecture Diagram
 
-This diagram shows the deployment architecture with a focus on the current local development setup. Note: No cloud infrastructure is currently implemented.
-
 ```plantuml
 @startuml Deployment Architecture
-!define RECTANGLE class
+!define RECTANGLE node
 
-skinparam componentStyle rectangle
-
-node "Developer Workstation" {
-    node "Django Dev Server\n:8000" as DevServer {
-        component "WSGI Application" as WSGI
-        component "Django Framework\n4.2.16" as Django
-        component "extractor_app" as App
-    }
-    
-    database "SQLite\ndb.sqlite3" as SQLite
-    folder "media/uploads/" as Media
-    
-    WSGI --> Django
-    Django --> App
-    App --> SQLite
-    App --> Media
+skinparam node {
+    BackgroundColor LightYellow
+    BorderColor Black
 }
 
-cloud "Internet" {
-    cloud "OpenAI Platform" as OpenAI {
-        component "GPT-3.5 API\nEndpoint" as GPTEndpoint
-    }
-    
-    cloud "Google Cloud" as GCP {
-        component "Gemini API\nEndpoint" as GeminiEndpoint
-    }
+skinparam component {
+    BackgroundColor LightBlue
+    BorderColor Black
 }
 
 actor "Financial Analyst" as User
+actor "System Admin" as Admin
 
-User -down-> DevServer : HTTP :8000\n(localhost)
-App -up-> GPTEndpoint : HTTPS\nREST API
-App -up-> GeminiEndpoint : HTTPS\nREST API
+node "Client Browser" as Browser {
+    component "React SPA\n(JavaScript Bundle)" as ReactApp
+    component "PDF.js Worker" as PDFWorker
+    component "localStorage" as LocalCache
+}
 
-note right of DevServer
-  **Current State:**
-  - Local development only
-  - No containerization
-  - No CI/CD pipeline
-  - No cloud deployment
-  
-  **Security Issues:**
-  - DEBUG=True
-  - Hardcoded API keys
-  - No authentication
-  - CSRF disabled
+node "Web Server\n(Django + WhiteNoise)" as WebServer {
+    component "Django Application\n(Python 3.11+)" as Django
+    component "Static File Server\n(WhiteNoise)" as WhiteNoise
+    component "WSGI Server\n(Gunicorn/uWSGI)" as WSGI
+    
+    WSGI --> Django
+    WhiteNoise --> Django
+}
+
+node "File System" as FileSystem {
+    database "SQLite Database\n(db.sqlite3)" as DB
+    folder "Media Storage\n(media/uploads/)" as MediaFolder
+    folder "Static Files\n(React Build)" as StaticFolder
+}
+
+cloud "External APIs" as ExternalAPIs {
+    component "OpenAI API\n(gpt-3.5-turbo)" as OpenAI
+    component "Google Gemini API\n(2.5-flash)" as Gemini
+}
+
+User --> Browser : HTTPS
+Admin --> Browser : HTTPS
+
+Browser --> WebServer : "HTTP/HTTPS\nREST API Calls\n(/api/*)"
+Browser --> WebServer : "Static Asset Requests\n(*.js, *.css)"
+
+ReactApp ..> PDFWorker : "PDF Rendering"
+ReactApp ..> LocalCache : "Cache Preferences"
+
+WebServer --> FileSystem : "Read/Write"
+Django --> DB : "ORM Queries"
+Django --> MediaFolder : "Store PDFs"
+WhiteNoise --> StaticFolder : "Serve React Build"
+
+Django --> ExternalAPIs : "HTTPS API Calls"
+OpenAI --> Django : "JSON Response"
+Gemini --> Django : "JSON Response"
+
+note right of WebServer
+  **Deployment Configuration:**
+  - Single server deployment
+  - Django serves both API and static files
+  - WhiteNoise for efficient static serving
+  - No separate Node.js server required
+  - Suitable for 50 concurrent users
 end note
 
-note left of User
-  **Access:**
-  Direct localhost access
-  No VPN or authentication
+note bottom of FileSystem
+  **Storage:**
+  - SQLite for development/small-scale
+  - Migration path to PostgreSQL documented
+  - File-based media storage
 end note
 
 @enduml
 ```
-
-**Deployment Notes:**
-- **Current Environment**: Local development only (not production-ready)
-- **Server**: Django development server (single-threaded, not suitable for production)
-- **Database**: SQLite single-file database (no connection pooling)
-- **File Storage**: Local filesystem (no cloud storage integration)
-- **Security**: Multiple critical vulnerabilities (see codeanalysis.md Section 10)
-
-**Production Deployment Requirements** (Not Implemented):
-- Production WSGI server (Gunicorn/uWSGI)
-- Reverse proxy (Nginx/Apache)
-- PostgreSQL database with connection pooling
-- Cloud storage (S3/GCS) for PDF files
-- Container orchestration (Docker/Kubernetes)
-- Load balancer with health checks
-- Secrets management (AWS Secrets Manager/Azure Key Vault)
-- HTTPS with valid SSL certificates
 
 ---
 
 ### Data Flow Diagram
 
-This diagram illustrates the flow of data through the system, from PDF upload to entity extraction and display.
-
 ```plantuml
 @startuml Data Flow
-!define RECTANGLE class
+!define RECTANGLE rectangle
 
-skinparam defaultTextAlignment center
-
-actor "Financial\nAnalyst" as User
-rectangle "Web Browser" as Browser
-rectangle "Django Application" as Django {
-    process "1. Upload\nHandler" as Upload
-    process "2. File\nSaver" as FileSaver
-    process "3. PDF Text\nExtractor" as PDFExtract
-    process "4. LLM\nOrchestrator" as LLMOrch
-    process "5. Response\nRenderer" as Renderer
+skinparam rectangle {
+    BackgroundColor<<process>> LightGreen
+    BackgroundColor<<datastore>> LightYellow
+    BackgroundColor<<external>> LightBlue
+    BorderColor Black
 }
 
-database "File System\nmedia/uploads/" as FileStore
-cloud "OpenAI API" as OpenAI
-cloud "Gemini API" as Gemini
+rectangle "Financial Analyst" as User <<external>>
 
-User --> Browser : Select PDF +\nChoose Model
-Browser --> Upload : POST multipart/form-data\n(pdf_file, model)
+rectangle "1.0\nUpload PDF\nDocument" as P1 <<process>>
+rectangle "2.0\nValidate File" as P2 <<process>>
+rectangle "3.0\nExtract Text\nfrom PDF" as P3 <<process>>
+rectangle "4.0\nProcess with\nLLM" as P4 <<process>>
+rectangle "5.0\nStore Extraction\nResults" as P5 <<process>>
+rectangle "6.0\nDisplay & Edit\nEntities" as P6 <<process>>
+rectangle "7.0\nExport Data" as P7 <<process>>
 
-Upload --> FileSaver : PDF File Object
-FileSaver --> FileStore : Write PDF\n(filename.pdf)
-FileStore --> FileSaver : File Path
+database "D1\nDocument\nMetadata" as D1 <<datastore>>
+database "D2\nExtraction\nResults" as D2 <<datastore>>
+database "D3\nPDF Files\n(media/uploads/)" as D3 <<datastore>>
+database "D4\nUser\nPreferences" as D4 <<datastore>>
 
-FileSaver --> PDFExtract : File Path
-PDFExtract --> FileStore : Read PDF
-FileStore --> PDFExtract : PDF Binary
-PDFExtract --> PDFExtract : Extract Text\n(PyMuPDF)
+rectangle "OpenAI/Gemini\nAPI" as LLM <<external>>
 
-PDFExtract --> LLMOrch : Extracted Text +\nModel Selection
+User -down-> P1 : "PDF File +\nModel Selection"
+P1 -down-> P2 : "File Object"
+P2 -down-> P3 : "Validated PDF"
+P2 -right-> D1 : "Store Metadata\n(filename, size, status)"
+P3 -down-> P4 : "Extracted Text"
+P3 -right-> D3 : "Store PDF File"
+P4 -right-> LLM : "Text Input"
+LLM -down-> P4 : "JSON Entities"
+P4 -down-> P5 : "Structured Entities"
+P5 -down-> D2 : "Store Extraction Data"
+P5 -down-> P6 : "Entity Data"
+D2 -up-> P6 : "Retrieve Results"
+D3 -up-> P6 : "Retrieve PDF"
+D4 -up-> P6 : "User Preferences\n(view mode, filters)"
+P6 -down-> User : "Display Results\n(Card/Table View)"
+User -down-> P6 : "Edit Entity Values"
+P6 -right-> D2 : "Update Entity\n(audit trail)"
+User -down-> P7 : "Export Request\n(JSON/CSV/Excel)"
+P7 -up-> D2 : "Retrieve Entity Data"
+P7 -down-> User : "Downloaded File"
 
-alt Model = "openai"
-    LLMOrch --> OpenAI : Prompt + Text\n(max_tokens=500)
-    OpenAI --> LLMOrch : JSON Entities
-else Model = "gemini"
-    LLMOrch --> Gemini : Prompt + Text
-    Gemini --> LLMOrch : JSON Entities
-end
-
-LLMOrch --> Renderer : Entities JSON +\nFile URL +\nExtracted Text
-
-Renderer --> Browser : HTML Response\n(entities + PDF preview)
-Browser --> User : Display Results
-
-note right of PDFExtract
-  **Data Transformation:**
-  PDF Binary → Raw Text
-  (page-by-page extraction)
+note right of P2
+  **Validation Rules:**
+  - File type: PDF only
+  - Max size: 10MB
+  - Required: Model selection
 end note
 
-note right of LLMOrch
-  **Data Transformation:**
-  Raw Text → Structured JSON
-  
-  **Entities Extracted:**
-  - Lender Information
-  - Borrower Details
-  - Loan Terms
-  - Location Data
-  - Person Information
+note right of P4
+  **LLM Processing:**
+  - OpenAI: gpt-3.5-turbo
+  - Gemini: 2.5-flash
+  - Returns structured JSON
+  - Categories: Lender, Borrower,
+    Loan Terms, Location, Person
 end note
 
-note bottom of FileStore
-  **Data Persistence:**
-  PDFs stored permanently
-  No cleanup mechanism
-  No database records
+note right of P7
+  **Export Formats:**
+  - JSON: Raw extraction data
+  - CSV: Flattened entities
+  - Excel: Multi-sheet workbook
+  - PDF: Formatted report
 end note
 
 @enduml
 ```
 
-**Data Transformation Pipeline:**
-
-1. **Input**: Multipart form data (PDF file + model selection)
-2. **Storage**: PDF saved to `media/uploads/` directory
-3. **Extraction**: PyMuPDF extracts text page-by-page
-4. **Enrichment**: LLM processes text with financial entity extraction prompt
-5. **Output**: JSON entities + PDF preview URL rendered in HTML
-
-**Data Quality Issues:**
-- No input validation (file type, size)
-- No sanitization of extracted text (prompt injection risk)
-- No schema validation of LLM output
-- No data persistence (entities not saved to database)
-
 ---
 
 ### Logical Data Model (ERD)
 
-This ERD represents the **intended** data model for the system. Note: Currently, no Django models are defined, and the database is unused.
-
 ```mermaid
 erDiagram
-    DOCUMENT ||--o{ EXTRACTION_RESULT : has
-    EXTRACTION_RESULT ||--o{ LENDER : contains
-    EXTRACTION_RESULT ||--o{ BORROWER : contains
-    EXTRACTION_RESULT ||--o{ LOAN_TERM : contains
-    EXTRACTION_RESULT ||--o{ LOCATION : contains
-    EXTRACTION_RESULT ||--o{ PERSON : contains
+    User ||--o{ Document : "uploads"
+    User ||--o{ UserPreference : "has"
+    Document ||--|| ExtractionResult : "has"
+    ExtractionResult ||--o{ EntityEdit : "tracks"
     
-    DOCUMENT {
-        int id PK
+    User {
+        UUID id PK
+        string username
+        string email
+        datetime created_at
+        datetime last_login
+    }
+    
+    Document {
+        UUID id PK
+        UUID user_id FK
         string filename
         string file_path
-        datetime uploaded_at
-        string uploaded_by
-        int file_size_bytes
-        string checksum_sha256
+        datetime upload_timestamp
+        integer file_size
+        enum status "Processing|Success|Failed"
+        enum selected_model "OpenAI|Gemini"
+        integer processing_time_ms
+        datetime created_at
+        datetime updated_at
     }
     
-    EXTRACTION_RESULT {
-        int id PK
-        int document_id FK
-        string model_used
-        datetime extracted_at
-        text raw_text
-        json entities_json
-        string status
-        text error_message
+    ExtractionResult {
+        UUID id PK
+        UUID document_id FK
+        JSON extraction_data
+        JSON confidence_scores
+        datetime created_at
+        datetime updated_at
     }
     
-    LENDER {
-        int id PK
-        int extraction_result_id FK
-        string lender_name
-        string lender_address
-        string lender_phone
-        string lender_email
+    EntityEdit {
+        UUID id PK
+        UUID extraction_result_id FK
+        UUID edited_by FK
+        string field_name
+        string old_value
+        string new_value
+        datetime edited_at
     }
     
-    BORROWER {
-        int id PK
-        int extraction_result_id FK
-        string borrower_name
-        string borrower_ssn
-        string borrower_address
-        string borrower_phone
-        string borrower_email
-    }
-    
-    LOAN_TERM {
-        int id PK
-        int extraction_result_id FK
-        decimal loan_amount
-        decimal interest_rate
-        int term_months
-        date start_date
-        date maturity_date
-        string loan_type
-    }
-    
-    LOCATION {
-        int id PK
-        int extraction_result_id FK
-        string property_address
-        string city
-        string state
-        string zip_code
-        string county
-    }
-    
-    PERSON {
-        int id PK
-        int extraction_result_id FK
-        string person_name
-        string person_role
-        string person_phone
-        string person_email
+    UserPreference {
+        UUID id PK
+        UUID user_id FK
+        string preference_key
+        JSON preference_value
+        datetime updated_at
     }
 ```
 
 **Entity Descriptions:**
 
-| Entity | Purpose | Current Status |
-|--------|---------|----------------|
-| DOCUMENT | Store metadata about uploaded PDF files | **Not Implemented** |
-| EXTRACTION_RESULT | Store LLM extraction results and raw text | **Not Implemented** |
-| LENDER | Financial institution providing the loan | **Not Implemented** |
-| BORROWER | Individual or entity receiving the loan | **Not Implemented** |
-| LOAN_TERM | Loan financial terms and conditions | **Not Implemented** |
-| LOCATION | Property location information | **Not Implemented** |
-| PERSON | Additional persons involved in the loan | **Not Implemented** |
+- **User**: Represents authenticated users (financial analysts, admins, QA engineers) with login credentials
+- **Document**: Stores metadata for uploaded PDF files including processing status and selected LLM model
+- **ExtractionResult**: Contains AI-extracted entity data in JSON format with optional confidence scores
+- **EntityEdit**: Audit trail for manual corrections made to extracted entity values
+- **UserPreference**: Caches user-specific settings (view mode, filter state, sort order) for session persistence
 
-**Implementation Notes:**
-- All entities are currently extracted by LLM but **not persisted** to database
-- Django models need to be created in `extractor_app/models.py`
-- Database migrations required after model creation
-- Consider adding audit fields (created_at, updated_at, created_by)
-- Add indexes on foreign keys and frequently queried fields
+**Key Relationships:**
+
+- One User uploads many Documents (1:N)
+- One Document has exactly one ExtractionResult (1:1)
+- One ExtractionResult can have many EntityEdits for audit tracking (1:N)
+- One User has many UserPreferences for different settings (1:N)
+- EntityEdit references User via edited_by for accountability (N:1)
 
 ---
 
 ## Use Case Sequence Diagrams
 
-### UC-001: Extract Financial Entities from PDF Document
+> **Note**: Each sequence diagram details the dynamic message flow and timing for its corresponding use case defined in `spec.md`. These diagrams complement the static use case diagrams in spec.md by showing the temporal sequence of interactions.
 
-**Source**: [codeanalysis.md#UC-001](codeanalysis.md#UC-001)
+### UC-001: Upload and Process PDF Document
 
-**Description**: Financial Document Analyst uploads a PDF containing loan documentation, selects an LLM model (OpenAI or Gemini), and receives structured financial entity data extracted from the document.
+**Source**: [spec.md#UC-001](../spec.md#UC-001)
 
 ```mermaid
 sequenceDiagram
-    participant Analyst as Financial Document<br/>Analyst
-    participant Browser as Web Browser
-    participant View as Django View<br/>extract_view()
-    participant FileSaver as File Handler
-    participant FileSystem as Local File<br/>System
-    participant PDFExtractor as PDF Extractor<br/>extract_text_from_pdf()
-    participant LLMOrch as LLM Orchestrator<br/>extract_entities_from_model()
-    participant OpenAI as OpenAI API<br/>GPT-3.5-turbo
-    participant Gemini as Google Gemini API<br/>gemini-2.5-pro
+    participant FA as Financial Analyst
+    participant UI as React SPA
+    participant Router as React Router
+    participant Upload as Upload Component
+    participant Query as React Query
+    participant API as Django REST API
+    participant Backend as Django Backend
+    participant PDF as PDF Processor
+    participant LLM as LLM Service (OpenAI/Gemini)
+    participant DB as SQLite Database
+    participant Storage as File Storage
 
-    Note over Analyst,Gemini: UC-001 - Extract Financial Entities from PDF Document
+    Note over FA,Storage: UC-001 - Upload and Process PDF Document
 
-    Analyst->>Browser: Navigate to / (GET)
-    Browser->>View: HTTP GET /
-    View->>Browser: Render upload form (index.html)
-    Browser->>Analyst: Display form
+    FA->>UI: Navigate to Dashboard
+    UI->>Router: Route to /dashboard
+    Router->>UI: Render Dashboard
+    FA->>UI: Click "Upload New Document"
+    UI->>Router: Navigate to /upload
+    Router->>Upload: Render Upload Page
+    Upload-->>FA: Display drag-drop zone + model selection
 
-    Analyst->>Browser: Select PDF file + Choose model
-    Analyst->>Browser: Click "Upload" button
-    Browser->>View: HTTP POST / (multipart/form-data)<br/>pdf_file, model
-
-    View->>View: Validate request.method == 'POST'
-    View->>View: Check request.FILES.get('pdf_file')
-
-    View->>FileSaver: Save uploaded file
-    FileSaver->>FileSystem: Write PDF to media/uploads/
-    FileSystem-->>FileSaver: File path returned
-    FileSaver-->>View: file_url
-
-    View->>PDFExtractor: extract_text_from_pdf(file_path)
-    PDFExtractor->>FileSystem: Open PDF with PyMuPDF
-    FileSystem-->>PDFExtractor: PDF document object
-
-    loop For each page in PDF
-        PDFExtractor->>PDFExtractor: Extract text from page
-    end
-
-    PDFExtractor->>PDFExtractor: Join all pages with newlines
-    PDFExtractor-->>View: extracted_text (string)
-
-    alt PDF extraction error
-        PDFExtractor-->>View: "Error extracting text: {error}"
-        View->>Browser: Render error message
-        Browser->>Analyst: Display error
-    end
-
-    View->>LLMOrch: extract_entities_from_model(extracted_text, selected_model)
+    FA->>Upload: Drag PDF file or click to browse
+    Upload->>Upload: Validate file (type=PDF, size≤10MB)
     
-    LLMOrch->>LLMOrch: Build financial entity prompt<br/>(Lender, Borrower, Terms, Location, Person)
-
-    alt Model = "openai"
-        LLMOrch->>OpenAI: ChatCompletion.create()<br/>model="gpt-3.5-turbo"<br/>max_tokens=500, temperature=0.2
-        OpenAI-->>LLMOrch: JSON response with entities
-    else Model = "gemini"
-        LLMOrch->>Gemini: generate_content()<br/>model="gemini-2.5-pro-exp-03-25"
-        Gemini-->>LLMOrch: JSON response with entities
-    else Invalid model
-        LLMOrch-->>View: "Invalid model selected"
+    alt File validation fails
+        Upload-->>FA: Display error: "Invalid file type/size"
+        FA->>Upload: Select different file
     end
 
-    alt LLM API error
-        LLMOrch-->>View: "Error extracting entities: {error}"
-        View->>Browser: Render error message
-        Browser->>Analyst: Display error
+    Upload-->>FA: Show file preview (filename, size, thumbnail)
+    FA->>Upload: Select LLM model (OpenAI/Gemini)
+    Upload->>Upload: Enable "Extract Entities" button
+    FA->>Upload: Click "Extract Entities"
+    
+    Upload->>Router: Navigate to /processing
+    Upload->>Query: Upload file + model selection
+    Query->>API: POST /api/documents/upload/ (multipart/form-data)
+    API->>Backend: Handle upload request
+    Backend->>Storage: Save PDF to media/uploads/
+    Storage-->>Backend: File path
+    Backend->>DB: INSERT Document (filename, status=Processing, model)
+    DB-->>Backend: Document ID
+    API-->>Query: 202 Accepted {document_id, status: "Processing"}
+    Query-->>Upload: Upload successful
+    
+    Note over Upload: Display Processing Status Page with spinner
+
+    Backend->>PDF: Extract text from PDF
+    PDF-->>Backend: Extracted text
+    Backend->>LLM: Send text + extraction prompt
+    
+    alt LLM API fails
+        LLM-->>Backend: Error (timeout/unavailable)
+        Backend->>DB: UPDATE Document status=Failed
+        Backend-->>API: 500 Error
+        API-->>Query: Error response
+        Query-->>Upload: Display error + Retry option
+        FA->>Upload: Click "Retry" or "Change Model"
+    else LLM API succeeds
+        LLM-->>Backend: JSON entities (Lender, Borrower, Loan, Location, Person)
+        Backend->>DB: INSERT ExtractionResult (extraction_data, confidence_scores)
+        Backend->>DB: UPDATE Document (status=Success, processing_time)
+        DB-->>Backend: Success
+        Backend-->>API: 200 OK {extraction_result_id}
     end
 
-    LLMOrch-->>View: model_output (JSON string)
-
-    Note over View: Currently returns mock data<br/>instead of actual LLM response
-
-    View->>View: Prepare context:<br/>file_url, extracted_text, model_output
-
-    View->>Browser: Render index.html with results
-    Browser->>Analyst: Display extracted entities<br/>+ PDF preview (iframe)
-
-    Analyst->>Browser: Review extracted entities
-    Analyst->>Browser: View PDF in embedded iframe
-
-    Note over Analyst,Gemini: **Postconditions:**<br/>- PDF stored in media/uploads/<br/>- Entities displayed (not persisted to DB)<br/>- No audit trail or logging
+    Query->>API: GET /api/documents/{id}/status/ (polling)
+    API-->>Query: {status: "Success", result_id}
+    Query->>Router: Navigate to /results/{document_id}
+    Router->>UI: Render Results Page
+    UI-->>FA: Display extracted entities in card view
 ```
 
-**Sequence Flow Summary:**
+---
 
-1. **Initiation**: Analyst accesses upload form via GET request
-2. **Upload**: Analyst submits PDF file with model selection via POST
-3. **Validation**: View validates request method and file presence (minimal validation)
-4. **Storage**: PDF saved to local filesystem (media/uploads/)
-5. **Text Extraction**: PyMuPDF extracts text page-by-page from PDF
-6. **LLM Processing**: Text sent to selected LLM (OpenAI or Gemini) with entity extraction prompt
-7. **Response**: LLM returns JSON-formatted financial entities
-8. **Rendering**: Results displayed alongside PDF preview in browser
+### UC-002: View and Edit Extraction Results
 
-**Critical Decision Points:**
-- Model selection (OpenAI vs Gemini) determines API routing
-- Error handling at PDF extraction and LLM API call stages
-- No retry logic or fallback mechanisms
+**Source**: [spec.md#UC-002](../spec.md#UC-002)
 
-**Error Scenarios:**
-- PDF parsing failure → Generic error message returned
-- LLM API rate limit/auth error → Generic error message returned
-- Invalid model selection → "Invalid model selected" error
-- No validation for file type, size, or content
+```mermaid
+sequenceDiagram
+    participant FA as Financial Analyst
+    participant UI as Results Component
+    participant Table as TanStack Table
+    participant PDF as PDF Viewer
+    participant Query as React Query
+    participant API as Django REST API
+    participant DB as SQLite Database
+    participant Storage as File Storage
 
-**Security Concerns:**
-- No authentication required (CSRF disabled)
-- No input validation or sanitization
-- Prompt injection vulnerability (user-controlled text in prompt)
-- API keys hardcoded in source code
-- No rate limiting (DoS risk)
+    Note over FA,Storage: UC-002 - View and Edit Extraction Results
+
+    FA->>UI: Navigate to Results page
+    UI->>Query: Fetch extraction results
+    Query->>API: GET /api/extraction-results/{id}/
+    API->>DB: SELECT ExtractionResult WHERE id=?
+    DB-->>API: Extraction data (JSON)
+    API-->>Query: 200 OK {extraction_data, confidence_scores}
+    Query-->>UI: Cache and return data
+    
+    UI->>UI: Organize entities by category (Lender, Borrower, Loan, Location, Person)
+    UI-->>FA: Display Card View (default)
+    
+    par Fetch PDF in parallel
+        UI->>Query: Fetch original PDF
+        Query->>API: GET /api/documents/{id}/pdf/
+        API->>Storage: Read PDF file
+        Storage-->>API: PDF binary
+        API-->>Query: 200 OK (PDF blob)
+        Query->>PDF: Render PDF
+        PDF-->>FA: Display PDF in side-by-side viewer
+    end
+
+    FA->>UI: Review entities and compare with PDF
+    FA->>UI: Identify incorrect field value
+    FA->>UI: Click field to edit
+    UI->>UI: Activate inline editing mode
+    UI-->>FA: Show editable input with current value
+    FA->>UI: Enter corrected value
+    FA->>UI: Press Enter or click outside
+    
+    UI->>UI: Validate new value (format, required)
+    
+    alt Validation fails
+        UI-->>FA: Display inline error: "Invalid format"
+        FA->>UI: Correct value again
+    else Validation succeeds
+        UI->>Query: Update field (optimistic update)
+        Query->>UI: Update local cache immediately
+        UI-->>FA: Show updated value
+        Query->>API: PATCH /api/extraction-results/{id}/
+        API->>DB: UPDATE ExtractionResult SET extraction_data=?
+        API->>DB: INSERT EntityEdit (field_name, old_value, new_value, edited_by, timestamp)
+        DB-->>API: Success
+        API-->>Query: 200 OK {updated_data}
+        Query-->>UI: Confirm update
+        UI-->>FA: Display success toast: "Field updated successfully"
+    end
+
+    FA->>UI: Toggle to Table View
+    UI->>Table: Render entities as tables
+    Table-->>FA: Display sortable tables with Field Name | Extracted Value
+    FA->>Table: Use quick-search filter
+    Table->>Table: Filter rows by search term
+    Table-->>FA: Show filtered results
+    
+    FA->>Table: Click column header to sort
+    Table->>Table: Sort by Field Name or Value
+    Table-->>FA: Display sorted table
+    
+    FA->>UI: Toggle back to Card View
+    UI->>UI: Preserve data and edit state
+    UI-->>FA: Display Card View with updated data
+```
+
+---
+
+### UC-003: Export Extraction Results
+
+**Source**: [spec.md#UC-003](../spec.md#UC-003)
+
+```mermaid
+sequenceDiagram
+    participant FA as Financial Analyst
+    participant UI as Results Component
+    participant Export as Export Module
+    participant SheetJS as SheetJS Library
+    participant Browser as Browser Download API
+    participant Query as React Query
+
+    Note over FA,Query: UC-003 - Export Extraction Results
+
+    FA->>UI: Review extraction results
+    FA->>UI: Click "Export to Excel" button
+    UI->>Export: Trigger Excel export
+    Export->>Export: Disable button + show loading spinner
+    Export->>Query: Get current extraction data from cache
+    Query-->>Export: Return entity data (all categories)
+    
+    Export->>SheetJS: Create new workbook
+    SheetJS-->>Export: Workbook object
+    
+    Export->>Export: Collect document metadata (filename, model, date, total entities)
+    Export->>SheetJS: Create "Overview" worksheet
+    SheetJS->>SheetJS: Add metadata rows
+    SheetJS-->>Export: Overview sheet created
+    
+    loop For each entity category (Lender, Borrower, Loan Terms, Location, Person)
+        Export->>Export: Extract category entities
+        
+        alt Category has data
+            Export->>SheetJS: Create worksheet with category name
+            SheetJS->>SheetJS: Add header row ["Field Name", "Extracted Value"]
+            SheetJS->>SheetJS: Apply header formatting (bold, blue bg #3B82F6, white text)
+            SheetJS->>SheetJS: Freeze header pane
+            
+            loop For each entity field
+                Export->>SheetJS: Add data row [field_name, value]
+                
+                alt Value is currency
+                    SheetJS->>SheetJS: Apply number format: $#,##0.00
+                else Value is percentage
+                    SheetJS->>SheetJS: Apply number format: 0.00%
+                end
+            end
+            
+            SheetJS->>SheetJS: Auto-size columns to fit content
+            SheetJS-->>Export: Worksheet created
+        else Category is empty
+            Export->>SheetJS: Create empty worksheet with headers only
+            SheetJS-->>Export: Empty worksheet created
+        end
+    end
+    
+    Export->>Export: Generate filename: {document_name}_entities_{YYYY-MM-DD}.xlsx
+    Export->>SheetJS: Write workbook to binary
+    SheetJS-->>Export: Excel file blob
+    
+    Export->>Browser: Trigger download (Blob API)
+    Browser-->>FA: Download Excel file to default directory
+    
+    Export->>Export: Re-enable export button
+    Export->>UI: Show success toast
+    UI-->>FA: Display notification: "Excel file downloaded successfully"
+    
+    FA->>Browser: Open downloaded file
+    Browser-->>FA: Display Excel workbook with multiple sheets
+    FA->>FA: Verify data structure and formatting
+
+    Note over FA,Export: Alternative Export Formats
+
+    alt User selects JSON export
+        FA->>UI: Click "Download as JSON"
+        UI->>Export: Trigger JSON export
+        Export->>Query: Get extraction data
+        Query-->>Export: Entity data
+        Export->>Export: Serialize to JSON
+        Export->>Browser: Download .json file
+        Browser-->>FA: JSON file downloaded
+    else User selects CSV export
+        FA->>UI: Click "Download as CSV"
+        UI->>Export: Trigger CSV export
+        Export->>Query: Get extraction data
+        Query-->>Export: Entity data
+        Export->>Export: Flatten entities to CSV format
+        Export->>Browser: Download .csv file
+        Browser-->>FA: CSV file downloaded
+    else User selects PDF Report
+        FA->>UI: Click "Generate PDF Report"
+        UI->>Export: Trigger PDF export
+        Export->>Export: Generate formatted PDF document
+        Export->>Browser: Download .pdf file
+        Browser-->>FA: PDF report downloaded
+    end
+```
+
+---
+
+### UC-004: Search and View Document History
+
+**Source**: [spec.md#UC-004](../spec.md#UC-004)
+
+```mermaid
+sequenceDiagram
+    participant FA as Financial Analyst
+    participant UI as History Component
+    participant Table as TanStack Table
+    participant Query as React Query
+    participant API as Django REST API
+    participant DB as SQLite Database
+
+    Note over FA,DB: UC-004 - Search and View Document History
+
+    FA->>UI: Click "History" in navigation
+    UI->>Query: Fetch document list
+    Query->>API: GET /api/documents/?page=1&limit=20
+    API->>DB: SELECT * FROM Document ORDER BY upload_timestamp DESC LIMIT 20
+    DB-->>API: Document records
+    API-->>Query: 200 OK {documents[], total_count, page_info}
+    Query-->>UI: Cache and return data
+    
+    UI->>UI: Render grid view (default) with document cards
+    UI-->>FA: Display documents (thumbnail, filename, date, status, model)
+    
+    FA->>UI: Enter search term "loan_application" in search bar
+    UI->>UI: Debounce search input (300ms)
+    UI->>Query: Fetch filtered documents
+    Query->>API: GET /api/documents/?search=loan_application&page=1
+    API->>DB: SELECT * WHERE filename LIKE '%loan_application%'
+    DB-->>API: Filtered documents
+    API-->>Query: 200 OK {filtered_documents[]}
+    Query-->>UI: Update data
+    UI-->>FA: Display filtered document list
+    
+    FA->>UI: Apply filter: Status="Success", Date Range="Last 7 days"
+    UI->>Query: Fetch with combined filters
+    Query->>API: GET /api/documents/?search=loan_application&status=Success&date_from={7_days_ago}&date_to={today}
+    API->>DB: SELECT * WHERE filename LIKE '%loan_application%' AND status='Success' AND upload_timestamp BETWEEN ? AND ?
+    DB-->>API: Refined results
+    API-->>Query: 200 OK {documents[]}
+    Query-->>UI: Update data
+    UI-->>FA: Display refined document list
+    
+    FA->>UI: Click sort by "Upload Date" (descending)
+    UI->>Table: Sort documents by upload_timestamp DESC
+    Table->>Table: Reorder document list
+    Table-->>FA: Display sorted documents (most recent first)
+    
+    FA->>UI: Click on specific document card
+    UI->>Query: Get document details
+    Query->>API: GET /api/documents/{id}/
+    API->>DB: SELECT * FROM Document WHERE id=?
+    DB-->>API: Document details
+    API-->>Query: 200 OK {document}
+    Query->>UI: Navigate to Results page
+    UI-->>FA: Redirect to /results/{document_id}
+    FA->>FA: Review extraction results from previous processing
+
+    Note over FA,DB: Alternative Flows
+
+    alt No documents exist
+        Query->>API: GET /api/documents/
+        API->>DB: SELECT COUNT(*) FROM Document
+        DB-->>API: count=0
+        API-->>Query: 200 OK {documents: [], total_count: 0}
+        Query-->>UI: Empty result
+        UI-->>FA: Display empty state: "No documents processed yet" + "Upload Your First Document" button
+    else Search returns no results
+        Query->>API: GET /api/documents/?search=nonexistent
+        API->>DB: SELECT * WHERE filename LIKE '%nonexistent%'
+        DB-->>API: Empty result
+        API-->>Query: 200 OK {documents: []}
+        UI-->>FA: Display: "No documents found matching 'nonexistent'" + suggestion to clear filters
+    else User deletes document
+        FA->>UI: Click delete icon on document
+        UI-->>FA: Show confirmation dialog: "Are you sure? This cannot be undone."
+        FA->>UI: Click "Confirm"
+        UI->>Query: Delete document (optimistic update)
+        Query->>UI: Remove from local cache
+        UI-->>FA: Remove document from list immediately
+        Query->>API: DELETE /api/documents/{id}/
+        API->>DB: UPDATE Document SET deleted_at=NOW() (soft delete)
+        API->>DB: UPDATE ExtractionResult SET deleted_at=NOW()
+        DB-->>API: Success
+        API-->>Query: 204 No Content
+        Query-->>UI: Confirm deletion
+        UI-->>FA: Display success toast: "Document deleted"
+    else User toggles to List View
+        FA->>UI: Click "List View" toggle
+        UI->>Table: Switch from grid cards to table layout
+        Table-->>FA: Display documents in tabular format (columns: Filename, Date, Status, Model, Actions)
+    end
+```
 
 ---
 
@@ -564,26 +784,43 @@ sequenceDiagram
 
 | Diagram Type | Purpose | Key Insights |
 |--------------|---------|--------------|
-| **System Context** | System boundary and external integrations | Shows dependency on OpenAI and Gemini APIs, local file storage, no authentication |
-| **Component Architecture** | Module breakdown and responsibilities | Reveals unused LLM backend abstraction, God Object anti-pattern in view, no database usage |
-| **Deployment Architecture** | Infrastructure and deployment topology | Highlights local-only deployment, no cloud infrastructure, multiple security vulnerabilities |
-| **Data Flow** | Data transformation pipeline | Illustrates synchronous processing bottleneck, no data persistence, no caching |
-| **Logical Data Model (ERD)** | Entity relationships and schema | Defines intended data model (not implemented), shows 7 entity types for financial loan data |
-| **UC-001 Sequence** | Dynamic behavior for PDF extraction use case | Details request flow, LLM routing logic, error handling gaps, security vulnerabilities |
-
-**Architectural Patterns Identified:**
-- **Monolithic Architecture**: Single Django application handles all concerns
-- **MVC (MTV)**: Django's Model-Template-View pattern
-- **Strategy Pattern (Partial)**: LLM backend abstraction exists but unused
-- **Direct API Integration**: Synchronous calls to external LLM APIs
-
-**Anti-Patterns Detected:**
-- **God Object**: All logic in single view function
-- **Hardcoded Configuration**: API keys in source code
-- **Dead Code**: Unused LLM backend classes, duplicate view_old.py
-- **Synchronous I/O**: Blocking LLM calls in web request handler
-- **No Error Boundaries**: Generic exception catching
+| **System Context** | Shows system boundary and external actors | Hybrid architecture with React frontend, Django backend, and external LLM APIs (OpenAI/Gemini) |
+| **Component Architecture** | Details internal component structure | Clear separation: Presentation (React), Business (Django), Data (SQLite) layers with shared UI components and state management |
+| **Deployment** | Illustrates deployment topology | Single-server deployment with Django serving both APIs and static files via WhiteNoise; no separate Node.js server required |
+| **Data Flow** | Traces data movement through system | 7-step process: Upload → Validate → Extract Text → LLM Processing → Store → Display/Edit → Export |
+| **ERD** | Defines database schema | 5 core entities: User, Document, ExtractionResult, EntityEdit, UserPreference with clear relationships and audit trail |
+| **UC-001 Sequence** | Upload and process workflow | Multi-step async flow with validation, LLM integration, error handling, and status polling |
+| **UC-002 Sequence** | View and edit results | Parallel PDF loading, inline editing with optimistic updates, view toggling (Card/Table), and real-time validation |
+| **UC-003 Sequence** | Export functionality | Client-side Excel generation with SheetJS, multi-sheet workbooks, formatting, and alternative export formats (JSON/CSV/PDF) |
+| **UC-004 Sequence** | Document history management | Advanced filtering, search, sorting, pagination, soft delete with confirmation, and empty state handling |
 
 ---
 
-*This design modelling document provides comprehensive visual representations of the GenAI PDF Extractor system architecture, supporting development, maintenance, and future enhancement efforts.*
+## Alignment with Requirements
+
+These models directly support the following requirements from `spec.md` and `design.md`:
+
+**Functional Requirements Coverage:**
+- FR-001 to FR-006: Navigation architecture reflected in Component Diagram
+- FR-013 to FR-023: Upload workflow detailed in UC-001 Sequence Diagram
+- FR-032 to FR-053: Results display and editing shown in UC-002 Sequence Diagram
+- FR-054 to FR-068: Export functionality illustrated in UC-003 Sequence Diagram
+- FR-069 to FR-078: Document history captured in UC-004 Sequence Diagram
+
+**Non-Functional Requirements Coverage:**
+- NFR-011: Backward compatibility maintained through hybrid architecture (System Context, Component Diagrams)
+- NFR-001 to NFR-004: Performance optimization through code splitting and lazy loading (Component Diagram)
+- NFR-007, NFR-008, NFR-018: Accessibility through shadcn/ui components (Component Diagram)
+- NFR-015: Client-side Excel export without server round-trip (UC-003 Sequence Diagram)
+
+**Data Requirements Coverage:**
+- DR-001 to DR-015: All data entities, relationships, and storage patterns defined in ERD and Data Flow Diagram
+- DR-004: Inline editing with validation shown in UC-002 Sequence Diagram
+- DR-005: Audit trail (EntityEdit) modeled in ERD
+- DR-011: Multi-format export detailed in UC-003 Sequence Diagram
+
+**Technical Requirements Coverage:**
+- TR-001: Hybrid architecture (Django REST + React SPA) shown in all architectural views
+- TR-003: React Router with lazy loading illustrated in Component Diagram
+- TR-007: React Query for state management depicted in sequence diagrams
+- TR-010: SheetJS for Excel export detailed in UC-003 Sequence Diagram
