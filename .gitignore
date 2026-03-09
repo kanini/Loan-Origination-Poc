@@ -2,6 +2,7 @@
 .env
 .env.local
 .env.*.local
+venv
 
 # OS specific files
 .DS_Store
@@ -17,3 +18,5 @@ Thumbs.db
 nul
 */settings.local.json
 .propel
+.propel/templates
+.windsurf
