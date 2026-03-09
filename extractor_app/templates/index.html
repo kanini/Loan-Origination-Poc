@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Entity Extraction</title>
+    <style>
+        .container {
+            display: flex;
+            margin-top: 20px;
+        }
+        .file-pane {
+            width: 40%;
+            padding: 20px;
+        }
+        .pdf-pane {
+            width: 60%;
+            padding: 20px;
+        }
+        .pdf-pane iframe {
+            width: 100%;
+            height: 600px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>PDF Entity Extraction</h1>
+
+<!-- Display uploaded PDF if available -->
+{% if file_url %}
+    <div class="container">
+        <div class="file-pane">
+            <h3>Extracted Entities:</h3>
+            <ul>
+                {% for entity in extracted_entities %}
+                    <li><strong>{{ entity.entity }}:</strong> {{ entity.value }}</li>
+                {% endfor %}
+            </ul>
+            <h3>Model Output:</h3>
+            <p>{{ model_output }}</p>
+        </div>
+        <div class="pdf-pane">
+            <h3>Uploaded PDF:</h3>
+            <iframe src="{{ file_url }}" frameborder="0"></iframe>
+        </div>
+    </div>
+{% endif %}
+
+<!-- Form for uploading a new file -->
+<h3>Upload a New PDF:</h3>
+<form method="POST" enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="file" name="pdf_file" required>
+    <select name="model">
+        <option value="openai">OpenAI</option>
+        <option value="gemini">Gemini</option>
+    </select>
+    <button type="submit">Upload</button>
+</form>
+
+</body>
+</html>
