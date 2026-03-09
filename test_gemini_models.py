@@ -4,8 +4,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Use the API key from views.py
-GEMINI_API_KEY = "AIzaSyAVBoKAUU-6QLQOePxcMYkhrTV_plIGPkY"
+# Load API key from environment variables
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 genai.configure(api_key=GEMINI_API_KEY)
 
