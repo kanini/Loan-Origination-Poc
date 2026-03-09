@@ -3,15 +3,37 @@
 .env.local
 .env.*.local
 venv
+venv310
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info
+dist/
+build/
+
+# Django
+*.log
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
 
 # OS specific files
 .DS_Store
 Thumbs.db
+
+# IDE and editor files
+.vscode
+.github
 
 # Temporary files
 *.tmp
 *.temp
 nul
 */settings.local.json
+.propel
 .propel/templates
 .windsurf
