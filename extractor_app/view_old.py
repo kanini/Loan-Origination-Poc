@@ -16,7 +16,7 @@ import google.generativeai as genai
 
 # Load keys from env or Django settings
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-GEMINI_API_KEY = "AIzaSyBolEZH7nuXHm3gB0G_RHzZvmwcWpVEkK8"
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 openai.api_key = OPENAI_API_KEY
 genai.configure(api_key=GEMINI_API_KEY)
