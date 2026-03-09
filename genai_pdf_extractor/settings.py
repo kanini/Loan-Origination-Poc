@@ -124,6 +124,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Allow iframes from same origin (for development)
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+
 # API keys should be loaded from environment variables
 # Set these in your .env file:
 # OPENAI_API_KEY=your-openai-key
