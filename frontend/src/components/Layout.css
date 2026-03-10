@@ -17,7 +17,7 @@
 .logo {
   font-size: 20px;
   font-weight: 700;
-  color: #3B82F6;
+  color: #2563EB;
   text-decoration: none;
 }
 
@@ -36,13 +36,13 @@
 }
 
 .nav-link:hover {
-  color: #3B82F6;
+  color: #2563EB;
 }
 
 .nav-link.active {
-  color: #3B82F6;
+  color: #2563EB;
   font-weight: 600;
-  border-bottom-color: #3B82F6;
+  border-bottom-color: #2563EB;
 }
 
 .user-profile {
@@ -65,8 +65,61 @@
   color: #EF4444;
 }
 
-.main-content {
+.main-area {
   margin-top: 64px;
+  display: flex;
+}
+
+.main-area.with-sidebar .main-content {
+  margin-left: 240px;
+  flex: 1;
+}
+
+.main-content {
+  flex: 1;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 240px;
+  background: #FFFFFF;
+  border-right: 1px solid #E5E7EB;
+  position: fixed;
+  top: 64px;
+  left: 0;
+  bottom: 0;
+  padding: 24px 16px;
+  z-index: 900;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  color: #4B5563;
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 500;
+  transition: all 150ms ease-in-out;
+}
+
+.sidebar-link:hover {
+  background: #F3F4F6;
+  color: #111827;
+}
+
+.sidebar-link.active {
+  background: #EFF6FF;
+  color: #2563EB;
+  font-weight: 600;
 }
 
 @media (max-width: 767px) {
@@ -76,5 +129,13 @@
 
   .nav {
     display: none;
+  }
+
+  .sidebar {
+    display: none;
+  }
+
+  .main-area.with-sidebar .main-content {
+    margin-left: 0;
   }
 }

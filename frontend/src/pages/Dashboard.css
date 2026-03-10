@@ -19,7 +19,7 @@
 }
 
 .cta-button {
-  background: #3B82F6;
+  background: #2563EB;
   color: white;
   border: none;
   padding: 16px 32px;
@@ -41,7 +41,7 @@
 }
 
 .cta-button:focus {
-  outline: 2px solid #3B82F6;
+  outline: 2px solid #2563EB;
   outline-offset: 2px;
 }
 

@@ -12,7 +12,6 @@ const formatFieldName = (fieldName) => {
 
 export default function Results({ uploadedDoc }) {
   const navigate = useNavigate()
-  const [viewMode, setViewMode] = useState('card')
   const [activeDoc, setActiveDoc] = useState('loan') // 'loan' or 'tax'
 
   if (!uploadedDoc?.result) {
@@ -71,29 +70,70 @@ export default function Results({ uploadedDoc }) {
       // Array of objects – render nothing here (handled by renderArrayOfObjects)
       return null
     }
-    // Nested object – flatten inline
-    return Object.entries(value)
-      .map(([k, v]) => `${formatFieldName(k)}: ${v ?? 'N/A'}`)
-      .join(', ')
+    // Nested object – return null to indicate it needs special handling
+    return null
+  }
+
+  // Helper: render a nested object as a subsection with field-value pairs
+  const renderNestedObject = (obj, sectionTitle) => {
+    return (
+      <div className="nested-section">
+        <div className="nested-section-title">{sectionTitle}</div>
+        <div className="field-grid">
+          {Object.entries(obj).map(([key, value]) => {
+            const renderedValue = renderValue(value)
+            // Skip if value is a nested object (would need recursive handling)
+            if (renderedValue === null && typeof value === 'object' && !Array.isArray(value)) {
+              return null
+            }
+            return (
+              <div key={key} className="field-row">
+                <div className="field-label">{formatFieldName(key)}</div>
+                <div className={`field-value ${!value && value !== 0 ? 'empty' : ''}`}>
+                  {renderedValue || 'N/A'}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
   }
 
   // Helper: render an array of objects as sub-cards with index labels
   const renderArrayOfObjects = (arr, parentLabel) => {
-    return arr.map((item, idx) => (
-      <div key={idx} className="entity-sub-card">
-        <div className="sub-card-label">{parentLabel} {idx + 1}</div>
-        <div className="field-grid">
-          {Object.entries(item).map(([key, value]) => (
-            <div key={key} className="field-row">
-              <div className="field-label">{formatFieldName(key)}</div>
-              <div className={`field-value ${!value && value !== 0 ? 'empty' : ''}`}>
-                {renderValue(value) || 'N/A'}
+    return arr.map((item, idx) => {
+      // For taxpayer-related data, always use numbered format (Taxpayer 1, Taxpayer 2, etc.)
+      // For other data, try to find a meaningful name if available
+      const isTaxpayerLabel = parentLabel.toLowerCase().includes('taxpayer')
+      let displayLabel
+      
+      if (isTaxpayerLabel) {
+        // Always use numbered format for taxpayers
+        displayLabel = `Taxpayer ${idx + 1}`
+      } else {
+        // For other data, try to find a meaningful name
+        const nameField = item.taxpayer_name || item.name || item.taxpayer || 
+                         item.borrower_name || item.borrower || null
+        displayLabel = nameField || `${parentLabel} ${idx + 1}`
+      }
+      
+      return (
+        <div key={idx} className="entity-sub-card">
+          <div className="sub-card-label">{displayLabel}</div>
+          <div className="field-grid">
+            {Object.entries(item).map(([key, value]) => (
+              <div key={key} className="field-row">
+                <div className="field-label">{formatFieldName(key)}</div>
+                <div className={`field-value ${!value && value !== 0 ? 'empty' : ''}`}>
+                  {renderValue(value) || 'N/A'}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
-    ))
+      )
+    })
   }
 
   // Categorize entity entries into nested objects, arrays-of-objects, and flat values
@@ -180,10 +220,51 @@ export default function Results({ uploadedDoc }) {
         ))}
         {/* Array-of-objects entries (e.g. Taxpayer Information: [{...}, {...}]) */}
         {arrayObjEntries.map(([category, arr]) => (
-          <div key={category} className="entity-card">
-            <div className="card-title">{category}</div>
-            {renderArrayOfObjects(arr, formatFieldName(category).replace(/s$/, ''))}
-          </div>
+          <>
+            {arr.map((item, idx) => {
+              // For taxpayer-related categories, always use numbered format (Taxpayer 1, Taxpayer 2, etc.)
+              // For other categories, try to use a meaningful name if available
+              const isTaxpayerCategory = category.toLowerCase().includes('taxpayer')
+              let displayTitle
+              
+              if (isTaxpayerCategory) {
+                // Always use numbered format for taxpayers
+                displayTitle = `Taxpayer ${idx + 1}`
+              } else {
+                // For other categories, try to find a meaningful name
+                const nameField = item.taxpayer_name || item.name || item.taxpayer || 
+                                 item.borrower_name || item.borrower || null
+                displayTitle = nameField || `${formatFieldName(category).replace(/s$/, '')} ${idx + 1}`
+              }
+              
+              return (
+                <div key={`${category}-${idx}`} className="entity-card">
+                  <div className="card-title">{displayTitle}</div>
+                  {Object.entries(item).map(([key, value]) => {
+                    // If value is a nested object, render it as a subsection
+                    if (value && typeof value === 'object' && !Array.isArray(value)) {
+                      return (
+                        <div key={key}>
+                          {renderNestedObject(value, formatFieldName(key))}
+                        </div>
+                      )
+                    }
+                    // Otherwise, render as a regular field-value pair
+                    const renderedValue = renderValue(value)
+                    if (renderedValue === null) return null
+                    return (
+                      <div key={key} className="field-row-standalone">
+                        <div className="field-label">{formatFieldName(key)}</div>
+                        <div className={`field-value ${!value && value !== 0 ? 'empty' : ''}`}>
+                          {renderedValue || 'N/A'}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </>
         ))}
       </>
     )
@@ -280,7 +361,7 @@ export default function Results({ uploadedDoc }) {
     <>
       <div className="breadcrumb">
         <div className="breadcrumb-list">
-          <Link to="/" className="breadcrumb-link">Home</Link>
+          <Link to="/dashboard" className="breadcrumb-link">Home</Link>
           <span className="breadcrumb-separator">/</span>
           <span>Results</span>
           {!isDualDoc && (
@@ -341,25 +422,11 @@ export default function Results({ uploadedDoc }) {
       <main className="results-main">
         <div className="entity-panel">
           <div className="panel-header">
-            <h2>Extracted Entities</h2>
-            <div className="view-toggle">
-              <button
-                className={`toggle-button ${viewMode === 'card' ? 'active' : ''}`}
-                onClick={() => setViewMode('card')}
-              >
-                Card View
-              </button>
-              <button
-                className={`toggle-button ${viewMode === 'table' ? 'active' : ''}`}
-                onClick={() => setViewMode('table')}
-              >
-                Table View
-              </button>
-            </div>
+            <h2>Details</h2>
           </div>
 
           <div className="entity-cards">
-            {viewMode === 'card' ? renderEntities() : renderTable()}
+            {renderEntities()}
           </div>
         </div>
 

@@ -37,30 +37,66 @@ function App() {
     setUploadedDoc(null)
   }
 
-  if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />
-  }
-
   return (
-    <Layout onLogout={handleLogout} uploadedDoc={uploadedDoc}>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route
-          path="/upload"
-          element={<Upload setUploadedDoc={setUploadedDoc} />}
-        />
-        <Route
-          path="/processing"
-          element={<Processing uploadedDoc={uploadedDoc} setUploadedDoc={setUploadedDoc} />}
-        />
-        <Route
-          path="/results"
-          element={<Results uploadedDoc={uploadedDoc} />}
-        />
-        <Route path="/history" element={<History />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Layout>
+    <Routes>
+      <Route
+        path="/"
+        element={
+          isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login onLogin={handleLogin} />
+        }
+      />
+      <Route
+        path="/dashboard"
+        element={
+          isAuthenticated ? (
+            <Layout onLogout={handleLogout} uploadedDoc={uploadedDoc}>
+              <Dashboard />
+            </Layout>
+          ) : <Navigate to="/" replace />
+        }
+      />
+      <Route
+        path="/upload"
+        element={
+          isAuthenticated ? (
+            <Layout onLogout={handleLogout} uploadedDoc={uploadedDoc}>
+              <Upload setUploadedDoc={setUploadedDoc} />
+            </Layout>
+          ) : <Navigate to="/" replace />
+        }
+      />
+      <Route
+        path="/processing"
+        element={
+          isAuthenticated ? (
+            <Layout onLogout={handleLogout} uploadedDoc={uploadedDoc}>
+              <Processing uploadedDoc={uploadedDoc} setUploadedDoc={setUploadedDoc} />
+            </Layout>
+          ) : <Navigate to="/" replace />
+        }
+      />
+      <Route
+        path="/results"
+        element={
+          isAuthenticated ? (
+            <Layout onLogout={handleLogout} uploadedDoc={uploadedDoc}>
+              <Results uploadedDoc={uploadedDoc} />
+            </Layout>
+          ) : <Navigate to="/" replace />
+        }
+      />
+      <Route
+        path="/history"
+        element={
+          isAuthenticated ? (
+            <Layout onLogout={handleLogout} uploadedDoc={uploadedDoc}>
+              <History />
+            </Layout>
+          ) : <Navigate to="/" replace />
+        }
+      />
+      <Route path="*" element={<Navigate to={isAuthenticated ? '/dashboard' : '/'} replace />} />
+    </Routes>
   )
 }
 

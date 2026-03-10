@@ -5,7 +5,7 @@
 
 .landing-left {
   flex: 1;
-  background: linear-gradient(135deg, #1E3A5F 0%, #1E40AF 50%, #3B82F6 100%);
+  background: #2563EB;
   color: white;
   display: flex;
   flex-direction: column;
@@ -149,12 +149,12 @@
 }
 
 .form-input:focus {
-  border-color: #3B82F6;
+  border-color: #2563EB;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .login-button {
-  background: #3B82F6;
+  background: #2563EB;
   color: white;
   border: none;
   padding: 12px 24px;

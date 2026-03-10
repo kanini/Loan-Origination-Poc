@@ -141,7 +141,7 @@ export default function Processing({ uploadedDoc, setUploadedDoc }) {
     <>
       <div className="breadcrumb">
         <div className="breadcrumb-list">
-          <Link to="/" className="breadcrumb-link">Home</Link>
+          <Link to="/dashboard" className="breadcrumb-link">Home</Link>
           <span className="breadcrumb-separator">/</span>
           <Link to="/upload" className="breadcrumb-link">Upload Document</Link>
           <span className="breadcrumb-separator">/</span>
@@ -192,7 +192,7 @@ export default function Processing({ uploadedDoc, setUploadedDoc }) {
           <div className="proc-action-buttons">
             <button className="button button-primary" onClick={handleRetry}>Retry</button>
             <button className="button button-secondary" onClick={() => navigate('/upload')}>Change Model</button>
-            <button className="button button-tertiary" onClick={() => navigate('/')}>Cancel</button>
+            <button className="button button-tertiary" onClick={() => navigate('/dashboard')}>Cancel</button>
           </div>
         </main>
       )}

@@ -5,84 +5,62 @@ import './Upload.css'
 
 export default function Upload({ setUploadedDoc }) {
   const navigate = useNavigate()
-  const loanInputRef = useRef(null)
-  const taxInputRef = useRef(null)
-  const [loanFile, setLoanFile] = useState(null)
-  const [taxFile, setTaxFile] = useState(null)
+  const fileInputRef = useRef(null)
+  const [files, setFiles] = useState([])
   const [selectedModel, setSelectedModel] = useState('openai')
-  const [dragOverLoan, setDragOverLoan] = useState(false)
-  const [dragOverTax, setDragOverTax] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
   const [error, setError] = useState('')
 
-  const handleFileSelect = (selectedFile, type) => {
+  const MAX_FILES = 10
+
+  const addFiles = (newFiles) => {
     setError('')
-    if (!selectedFile) return
+    const incoming = Array.from(newFiles)
+    const validFiles = []
 
-    if (selectedFile.type !== 'application/pdf') {
-      setError(`${type === 'loan' ? 'Loan' : 'Tax'} file type not supported. Please upload a PDF file.`)
+    for (const f of incoming) {
+      if (f.type !== 'application/pdf') {
+        setError(`"${f.name}" is not a PDF. Only PDF files are supported.`)
+        return
+      }
+      if (f.size > 10 * 1024 * 1024) {
+        setError(`"${f.name}" exceeds the 10 MB size limit.`)
+        return
+      }
+      // Skip duplicates by name
+      if (files.some((existing) => existing.name === f.name)) continue
+      validFiles.push(f)
+    }
+
+    const combined = [...files, ...validFiles]
+    if (combined.length > MAX_FILES) {
+      setError(`You can upload a maximum of ${MAX_FILES} documents.`)
       return
     }
-
-    if (selectedFile.size > 10 * 1024 * 1024) {
-      setError(`${type === 'loan' ? 'Loan' : 'Tax'} file size exceeds 10MB limit.`)
-      return
-    }
-
-    if (type === 'loan') {
-      setLoanFile(selectedFile)
-    } else {
-      setTaxFile(selectedFile)
-    }
+    setFiles(combined)
   }
 
-  const handleDrop = (e, type) => {
+  const handleDrop = (e) => {
     e.preventDefault()
-    if (type === 'loan') {
-      setDragOverLoan(false)
-    } else {
-      setDragOverTax(false)
-    }
-    const droppedFile = e.dataTransfer.files[0]
-    handleFileSelect(droppedFile, type)
+    setDragOver(false)
+    addFiles(e.dataTransfer.files)
   }
 
-  const handleDragOver = (e, type) => {
-    e.preventDefault()
-    if (type === 'loan') {
-      setDragOverLoan(true)
-    } else {
-      setDragOverTax(true)
-    }
-  }
-
-  const handleDragLeave = (type) => {
-    if (type === 'loan') {
-      setDragOverLoan(false)
-    } else {
-      setDragOverTax(false)
-    }
-  }
-
-  const handleRemoveFile = (type) => {
-    if (type === 'loan') {
-      setLoanFile(null)
-      if (loanInputRef.current) loanInputRef.current.value = ''
-    } else {
-      setTaxFile(null)
-      if (taxInputRef.current) taxInputRef.current.value = ''
-    }
+  const handleRemoveFile = (index) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index))
     setError('')
   }
 
   const handleExtract = () => {
-    if (!loanFile || !taxFile) {
-      setError('Please upload both loan application and tax return documents.')
+    if (files.length < 2) {
+      setError('Please upload at least two documents (loan application and tax return).')
       return
     }
-    setUploadedDoc({ 
-      loanFile, 
-      taxFile, 
-      model: selectedModel 
+    // Send the first file as loan and the second as tax for backend compatibility
+    setUploadedDoc({
+      loanFile: files[0],
+      taxFile: files[1],
+      model: selectedModel,
     })
     navigate('/processing')
   }
@@ -93,21 +71,21 @@ export default function Upload({ setUploadedDoc }) {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
   }
 
-  const currentStep = (loanFile && taxFile) ? 3 : (loanFile || taxFile) ? 2 : 1
+  const currentStep = files.length >= 2 ? 3 : files.length >= 1 ? 2 : 1
 
   return (
     <>
       <div className="breadcrumb">
         <div className="breadcrumb-list">
-          <Link to="/" className="breadcrumb-link">Home</Link>
+          <Link to="/dashboard" className="breadcrumb-link">Home</Link>
           <span className="breadcrumb-separator">/</span>
           <span>Upload Documents</span>
         </div>
       </div>
 
       <main className="upload-page">
-        <h1>Upload Loan & Tax Documents</h1>
-        <p className="page-subtitle">Upload both your loan application and tax return for comprehensive analysis</p>
+        <h1>Upload Documents</h1>
+        <p className="page-subtitle">Upload your loan application and tax return documents for comprehensive analysis</p>
 
         <div className="step-indicator">
           <div className="step">
@@ -128,108 +106,50 @@ export default function Upload({ setUploadedDoc }) {
 
         {error && <div className="error-banner">{error}</div>}
 
-        <div className="dual-upload-container">
-          {/* Loan Application Upload */}
-          <div className="upload-section">
-            <h3 className="upload-section-title">
-              <span className="doc-badge loan">1</span>
-              Loan Application
-            </h3>
-            <div
-              className={`drop-zone compact ${dragOverLoan ? 'drag-over' : ''} ${loanFile ? 'has-file' : ''}`}
-              onDrop={(e) => handleDrop(e, 'loan')}
-              onDragOver={(e) => handleDragOver(e, 'loan')}
-              onDragLeave={() => handleDragLeave('loan')}
-              onClick={() => loanInputRef.current?.click()}
-              role="button"
-              tabIndex={0}
-              aria-label="Upload loan application PDF"
-            >
-              {!loanFile ? (
-                <>
-                  <UploadIcon size={32} className="upload-icon" />
-                  <div className="drop-zone-text">Drop loan application here</div>
-                  <div className="drop-zone-subtext">or click to browse (Max 10MB)</div>
-                </>
-              ) : (
-                <div className="file-preview-inline">
-                  <FileText size={32} className="file-icon" />
-                  <div className="file-info">
-                    <div className="file-name">{loanFile.name}</div>
-                    <div className="file-size">{formatFileSize(loanFile.size)}</div>
-                  </div>
-                  <button 
-                    className="remove-button-inline" 
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleRemoveFile('loan')
-                    }} 
-                    aria-label="Remove loan file"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-              )}
-              <input
-                ref={loanInputRef}
-                type="file"
-                accept=".pdf"
-                style={{ display: 'none' }}
-                onChange={(e) => handleFileSelect(e.target.files[0], 'loan')}
-              />
-            </div>
+        <div className="single-upload-container">
+          <div
+            className={`drop-zone ${dragOver ? 'drag-over' : ''} ${files.length > 0 ? 'has-file' : ''}`}
+            onDrop={handleDrop}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onClick={() => fileInputRef.current?.click()}
+            role="button"
+            tabIndex={0}
+            aria-label="Upload PDF documents"
+          >
+            <UploadIcon size={40} className="upload-icon" />
+            <div className="drop-zone-text">Drop your documents here</div>
+            <div className="drop-zone-subtext">or click to browse &middot; PDF only &middot; Max 10 MB each</div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf"
+              multiple
+              style={{ display: 'none' }}
+              onChange={(e) => { addFiles(e.target.files); e.target.value = '' }}
+            />
           </div>
 
-          {/* Tax Return Upload */}
-          <div className="upload-section">
-            <h3 className="upload-section-title">
-              <span className="doc-badge tax">2</span>
-              Tax Return Form
-            </h3>
-            <div
-              className={`drop-zone compact ${dragOverTax ? 'drag-over' : ''} ${taxFile ? 'has-file' : ''}`}
-              onDrop={(e) => handleDrop(e, 'tax')}
-              onDragOver={(e) => handleDragOver(e, 'tax')}
-              onDragLeave={() => handleDragLeave('tax')}
-              onClick={() => taxInputRef.current?.click()}
-              role="button"
-              tabIndex={0}
-              aria-label="Upload tax return PDF"
-            >
-              {!taxFile ? (
-                <>
-                  <UploadIcon size={32} className="upload-icon" />
-                  <div className="drop-zone-text">Drop tax return here</div>
-                  <div className="drop-zone-subtext">or click to browse (Max 10MB)</div>
-                </>
-              ) : (
-                <div className="file-preview-inline">
-                  <FileText size={32} className="file-icon" />
+          {files.length > 0 && (
+            <div className="file-list">
+              {files.map((f, idx) => (
+                <div key={idx} className="file-list-item">
+                  <FileText size={24} className="file-icon" />
                   <div className="file-info">
-                    <div className="file-name">{taxFile.name}</div>
-                    <div className="file-size">{formatFileSize(taxFile.size)}</div>
+                    <div className="file-name">{f.name}</div>
+                    <div className="file-size">{formatFileSize(f.size)}</div>
                   </div>
-                  <button 
-                    className="remove-button-inline" 
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleRemoveFile('tax')
-                    }} 
-                    aria-label="Remove tax file"
+                  <button
+                    className="remove-button-inline"
+                    onClick={() => handleRemoveFile(idx)}
+                    aria-label={`Remove ${f.name}`}
                   >
                     <X size={18} />
                   </button>
                 </div>
-              )}
-              <input
-                ref={taxInputRef}
-                type="file"
-                accept=".pdf"
-                style={{ display: 'none' }}
-                onChange={(e) => handleFileSelect(e.target.files[0], 'tax')}
-              />
+              ))}
             </div>
-          </div>
+          )}
         </div>
 
         <div className="model-selection">
@@ -261,10 +181,10 @@ export default function Upload({ setUploadedDoc }) {
         </div>
 
         <div className="action-buttons">
-          <button className="button button-secondary" onClick={() => navigate('/')}>Cancel</button>
+          <button className="button button-secondary" onClick={() => navigate('/dashboard')}>Cancel</button>
           <button
             className="button button-primary"
-            disabled={!loanFile || !taxFile}
+            disabled={files.length < 2}
             onClick={handleExtract}
           >
             Extract Entities
