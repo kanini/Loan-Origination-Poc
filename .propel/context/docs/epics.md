@@ -116,28 +116,26 @@
 
 ### EP-004: Document Upload Workflow
 
-**Business Value:** Streamlines document upload process with intuitive drag-and-drop interface, reducing upload time by 50% and minimizing user errors through inline validation.
+**Business Value:** Streamlines document upload process with unified multi-file drop zone, reducing upload time by 50% and minimizing user errors through inline validation. Supports batch upload of loan application and tax return documents in a single workflow.
 
-**Description:** Implement multi-step document upload workflow with drag-and-drop file selection, LLM model selection, file preview, and upload progress tracking. Use react-dropzone for file handling with validation for PDF type and 10MB size limit. Integrate React Hook Form with Zod validation for form management.
+**Description:** Implement unified multi-file document upload workflow with a single drag-and-drop zone (no section headings), file list management, LLM model selection, and file validation. Support up to 10 files per upload session with automatic duplicate detection. First file maps as loan_file, second as tax_file for backend dual-document processing.
 
 **UI Impact:** Yes
 
 **Screen References:** SCR-002 (Document Upload)
 
 **Key Deliverables:**
-- Drag-and-drop upload zone using react-dropzone with visual feedback (dashed border highlight on drag-over)
-- Click-to-browse file selection fallback
-- File validation for type (PDF only) and size (≤10MB) with immediate feedback
-- Inline error messages: "File type not supported. Please upload a PDF file" or "File size exceeds 10MB limit"
-- File preview component showing filename, file size, thumbnail, and remove button
+- Single unified drag-and-drop zone (no separate sections) using native file input with visual feedback (dashed border highlight on drag-over)
+- Click-to-browse file selection fallback (multi-file support)
+- File validation for type (PDF only), size (≤10MB per file), and duplicate filename detection with immediate feedback
+- Inline error messages: "File type not supported. Please upload a PDF file", "File size exceeds 10MB limit", or "File already added"
+- File list below drop zone showing each uploaded file with PDF icon, filename, file size, and individual remove button (X icon)
+- Support for up to 10 files per upload session (MAX_FILES = 10)
 - LLM model selection UI with radio buttons/cards for OpenAI GPT and Gemini with descriptions
-- Step-by-step progress indicator: Step 1 (Select File) → Step 2 (Choose Model) → Step 3 (Confirm)
-- Upload progress bar with percentage indicator
-- Cancel option during upload to abort operation
-- "Extract Entities" button disabled until file and model selected
-- React Hook Form integration with Zod schema validation
+- "Extract Entities" button disabled until at least one file and model selected
+- Automatic mapping: files[0] → loan_file, files[1] → tax_file for backend `/api/extract/` endpoint compatibility
 - Redirect to processing status page after successful upload
-- Validation state with red borders and specific error guidance
+- Centered form container (max-width: 640px)
 
 **Dependent EPICs:** EP-001, EP-002
 
@@ -171,9 +169,9 @@
 
 ### EP-006: Results Display & Entity Visualization
 
-**Business Value:** Core work screen enabling efficient review and editing of extracted entity data, reducing data verification time by 40% through structured visualization and inline editing capabilities.
+**Business Value:** Core work screen enabling efficient review and editing of extracted entity data, reducing data verification time by 40% through structured visualization, inline editing capabilities, dual-document support, and AI chatbot Q&A.
 
-**Description:** Build comprehensive results display page with card-based and table-based entity visualization, PDF viewer integration, and inline editing functionality. Implement TanStack Table v8 for sortable, filterable tables with virtualization for large datasets. Use react-pdf for PDF rendering with zoom and navigation controls.
+**Description:** Build comprehensive results display page with card-based and table-based entity visualization, PDF viewer integration, dual-document tab navigation, nested object rendering, and inline editing functionality. Integrate AI chatbot overlay for contextual Q&A. Implement TanStack Table v8 for sortable, filterable tables with virtualization for large datasets. Use react-pdf for PDF rendering with zoom and navigation controls.
 
 **UI Impact:** Yes
 
@@ -181,8 +179,10 @@
 
 **Key Deliverables:**
 - Document information header with filename, upload date, model used, processing time, and action buttons (Edit, Export, Delete)
-- Entity display organized by categories: Lender Information, Borrower Details, Loan Terms, Location Data, Person Information
-- Card View (default): Each category in separate card with field label + value pairs, confidence scores, click-to-edit inline editing
+- **Dual-document tab navigation**: Tab bar for switching between "Loan Application" and "Tax Return Form" when both documents are processed
+- Entity display organized by categories — **Loan**: Lender Information, Borrower Details, Loan Terms, Location Data, Person Information; **Tax Return**: Taxpayer Information, Filing Information, Income Details, Deductions, Tax Calculations, Refund or Amount Due
+- **Nested object rendering**: Grouped sub-sections with numbered labels (e.g., "Taxpayer 1", "Taxpayer 2") with structured field-value pairs instead of flattened inline text
+- Card View (default): Each category in separate card with field label + value pairs, nested sub-sections, confidence scores, click-to-edit inline editing
 - Table View: Each category as dedicated table with columns (Field Name, Extracted Value), sortable columns, quick-search filter, sticky headers, row striping
 - Toggle switch for Card View ↔ Table View with state persistence in localStorage
 - TanStack Table v8 configuration with sorting, filtering, inline editing capabilities
@@ -197,6 +197,7 @@
 - Accessible table markup with `<thead>`, `<tbody>`, `<th scope>` attributes and ARIA labels
 - "Copy Row" action to copy field label and value to clipboard
 - "Process Another Document" quick action button
+- **AI Chatbot FAB** (floating action button) at bottom-right corner toggling chatbot overlay (see EP-016)
 
 **Dependent EPICs:** EP-001, EP-002, EP-005
 
@@ -204,17 +205,17 @@
 
 ### EP-007: Export Functionality & Multi-Format Support
 
-**Business Value:** Enables seamless data export in multiple formats (JSON, CSV, Excel, PDF), facilitating downstream analysis and reducing manual data entry by 80%.
+**Business Value:** Enables seamless data export for downstream analysis and reducing manual data entry by 80%. JSON export is currently implemented; CSV, Excel, and PDF formats are planned for future phases.
 
-**Description:** Implement client-side export functionality using SheetJS for Excel generation, supporting JSON, CSV, Excel (.xlsx with multi-sheet workbooks), and PDF report formats. Excel export includes formatted headers, auto-sized columns, number formatting for currency and percentages, and overview worksheet with metadata.
+**Description:** Implement client-side export functionality. Currently supports JSON export via Blob API download. Planned: SheetJS for Excel generation supporting CSV, Excel (.xlsx with multi-sheet workbooks), and PDF report formats. Excel export will include formatted headers, auto-sized columns, number formatting for currency and percentages, and overview worksheet with metadata.
 
 **UI Impact:** Yes
 
 **Screen References:** SCR-004 (Results/Output Display)
 
 **Key Deliverables:**
-- Export dropdown button with 4 options: Download as JSON, Download as CSV, Download as Excel, Generate PDF Report
-- JSON export with download trigger using Blob API
+- Export dropdown button with options: Download as JSON (implemented), Download as CSV (planned), Download as Excel (planned), Generate PDF Report (planned)
+- JSON export with download trigger using Blob API (implemented)
 - CSV export with flattened entity data using custom serialization
 - Excel export using SheetJS (xlsx library) with client-side generation (no server round-trip)
 - Multi-sheet Excel workbook: Overview worksheet + separate worksheets for each entity category (Lender, Borrower, Loan Terms, Location, Person)
@@ -460,7 +461,62 @@
 - Test coverage reports and quality metrics
 - Timeline compliance: Complete within 6-8 weeks (NFR-020)
 
-**Dependent EPICs:** EP-001, EP-002, EP-003, EP-004, EP-005, EP-006, EP-007, EP-008, EP-009, EP-010, EP-011, EP-012, EP-013, EP-014
+**Dependent EPICs:** EP-001, EP-002, EP-003, EP-004, EP-005, EP-006, EP-007, EP-008, EP-009, EP-010, EP-011, EP-012, EP-013, EP-014, EP-016, EP-017
+
+---
+
+### EP-016: AI Chatbot Integration
+
+**Business Value:** Enhances user productivity by enabling contextual Q&A about extracted document data directly on the Results page, reducing the need to manually search through entities and improving data comprehension by 30%.
+
+**Description:** Implement AI-powered chatbot overlay on the Results page using Azure OpenAI as the primary LLM service with Google Gemini (gemini-2.5-flash) as automatic fallback. The chatbot provides context-aware answers based on extracted document data and supports dual-document awareness.
+
+**UI Impact:** Yes
+
+**Screen References:** SCR-004 (Results/Output Display)
+
+**Key Deliverables:**
+- Floating Action Button (FAB) at bottom-right of Results page to toggle chatbot overlay
+- Chatbot overlay window (380×520px) with header, scrollable message area, and input field
+- Header title: "Dual Document Assistant" (when both loan and tax docs present) or "Document Assistant" (single doc)
+- POST endpoint integration with `/api/chat/` sending user message, conversation history, and extraction context
+- Azure OpenAI as primary chatbot service with automatic fallback to Google Gemini
+- Markdown rendering of AI responses using ReactMarkdown
+- Conversation history management: rolling window of last 10 messages for context continuity
+- Multiline input support via Shift+Enter; Enter to send
+- Typing indicator (animated dots) while waiting for AI response
+- Auto-focus on input field when chatbot opens
+- Dual-document context: chatbot includes both loan and tax extraction data when available
+- Close button in header; clicking FAB again also closes overlay
+- Conversation history preserved in client-side state for session duration (not persisted to database)
+
+**Dependent EPICs:** EP-001, EP-006, EP-013
+
+---
+
+### EP-017: Dual-Document / Batch Processing Support
+
+**Business Value:** Enables processing of multiple related documents (loan application + tax return form) in a single workflow, reducing multi-document processing time by 60% and providing a unified view of cross-document data.
+
+**Description:** Implement dual-document support throughout the application — from unified multi-file upload to dual-document processing, tab-based results navigation, and context-aware entity categorization. Tax return extraction uses specialized prompts producing Taxpayer Information, Filing Information, Income Details, Deductions, Tax Calculations, and Refund or Amount Due categories.
+
+**UI Impact:** Yes
+
+**Screen References:** SCR-002 (Document Upload), SCR-003 (Processing Status), SCR-004 (Results/Output Display)
+
+**Key Deliverables:**
+- Unified single drop zone replacing dual/separate upload sections (no section headings)
+- File list management with individual file removal
+- Automatic file mapping: files[0] → loan_file, files[1] → tax_file for `/api/extract/` endpoint
+- Processing page detection of dual-document upload (isDualUpload flag) with appropriate progress messaging
+- Backend dual-document extraction with separate entity prompts per document type
+- Results page document tab navigation: "Loan Application" and "Tax Return Form" tabs
+- Tax return entity categories: Taxpayer Information, Filing Information, Income Details, Deductions, Tax Calculations, Refund or Amount Due
+- Numbered taxpayer labels ("Taxpayer 1", "Taxpayer 2") instead of using names as section titles
+- Nested object rendering as grouped sub-sections with title and structured field-value pairs
+- Active document state management for switching between loan and tax extraction data
+
+**Dependent EPICs:** EP-001, EP-004, EP-006, EP-013
 
 ---
 
@@ -472,7 +528,7 @@
 
 ## Requirements Traceability Matrix
 
-### Functional Requirements (FR-001 to FR-116)
+### Functional Requirements (FR-001 to FR-132)
 - **FR-001 to FR-006:** EP-002 (Navigation & Information Architecture)
 - **FR-007 to FR-012:** EP-003 (Dashboard & Home Page)
 - **FR-013 to FR-023:** EP-004 (Document Upload Workflow)
@@ -485,6 +541,8 @@
 - **FR-095 to FR-100:** EP-010 (Error Handling & User Feedback)
 - **FR-101 to FR-110:** EP-011 (Accessibility & WCAG Compliance)
 - **FR-111 to FR-116:** EP-012 (Responsive Design & Cross-Device Support)
+- **FR-117 to FR-126:** EP-016 (AI Chatbot Integration)
+- **FR-127 to FR-132:** EP-017 (Dual-Document / Batch Processing Support)
 
 ### Non-Functional Requirements (NFR-001 to NFR-020)
 - **NFR-001 to NFR-005:** EP-014 (Performance Optimization & Code Splitting)

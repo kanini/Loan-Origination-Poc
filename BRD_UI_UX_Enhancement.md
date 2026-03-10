@@ -1,8 +1,8 @@
 # Business Requirements Document (BRD)
 ## UI/UX Enhancement for GenAI PDF Extractor Application
 
-**Document Version:** 1.0  
-**Date:** March 9, 2026  
+**Document Version:** 2.0  
+**Date:** March 10, 2026  
 **Project Name:** GenAI PDF Extractor - UI/UX Modernization  
 **Prepared By:** Product Team  
 
@@ -14,7 +14,7 @@ This Business Requirements Document outlines the requirements for a comprehensiv
 
 **Current State:** Single-page application with minimal styling, inline CSS, basic HTML form, and limited user feedback mechanisms.
 
-**Desired State:** Modern, multi-page application with professional UI design, intuitive navigation, responsive layouts, and enhanced data visualization capabilities.
+**Desired State:** Modern, multi-page application with professional UI design, intuitive navigation, responsive layouts, enhanced data visualization capabilities, AI-powered chatbot assistance, batch document processing, and comprehensive export functionality.
 
 ---
 
@@ -87,23 +87,36 @@ The GenAI PDF Extractor is a Django-based web application that extracts structur
 - Export functionality (JSON, CSV, Excel/XLSX, PDF report)
 - One-click Excel export button to download extraction results as a formatted .xlsx spreadsheet
 
+**AI Chatbot Integration:**
+- Context-aware AI chatbot embedded in the Results page as a floating assistant
+- Supports both single-document and dual-document conversation context
+- Powered by Azure OpenAI or Google Gemini models with automatic fallback
+- Maintains conversation history for coherent multi-turn interactions
+- Renders AI responses in rich Markdown format
+
+**Batch Document Processing:**
+- Unified upload interface supporting multiple PDF documents simultaneously
+- Support for processing Loan Application and Tax Return documents together
+- Drag-and-drop multi-file upload with individual file management (add/remove)
+- Parallel document processing with combined results display
+- Up to 10 documents per batch upload
+
 **User Experience Enhancements:**
-- Drag-and-drop file upload
+- Drag-and-drop file upload (single and multi-file)
 - Real-time extraction progress indicators
 - Inline validation and error messaging
 - Contextual help and tooltips
+- AI chatbot guidance for document analysis
 - Keyboard shortcuts for power users
 
 ### 4.2 Out of Scope
 
-- Backend API changes (unless required for new UI features)
 - Database schema modifications
-- Authentication and authorization system changes
-- LLM model selection or prompt engineering
 - Multi-language support (i18n)
-- Advanced analytics and reporting features
-- Batch processing capabilities
+- Advanced analytics and reporting features beyond export
 - Integration with external document management systems
+- Mobile native app development
+- Batch processing beyond Loan Application and Tax Return document types
 
 ### 4.3 Assumptions
 
@@ -260,6 +273,142 @@ The GenAI PDF Extractor is a Django-based web application that extracts structur
 - Export handles edge cases: empty categories produce an empty sheet with headers only; special characters in field values are properly escaped
 - Export button is keyboard accessible and includes an ARIA label ("Export extraction results to Excel spreadsheet")
 
+### FR-011: AI Chatbot Integration
+**Priority:** High  
+**Description:** Provide an AI-powered chatbot assistant embedded in the application that helps users interact with extracted document data, answer queries about their documents, and guide them through processes.
+
+**Feature Description:**  
+The AI Chatbot is a context-aware conversational assistant that appears as a floating action button on the Results page. It allows users to ask natural-language questions about the extracted entities, request summaries, compare data across loan and tax documents, and receive guided analysis without leaving the results view.
+
+**Functional Changes:**
+- Floating chatbot button (bottom-right corner) visible on the Results page when extracted data is available
+- Expandable chat window (380×520px) with message history, typing indicator, and input field
+- Dual-document awareness: automatically includes context from both Loan Application and Tax Return documents when both are present
+- Conversation history maintained (last 10 messages) for coherent multi-turn dialogue
+- AI responses rendered in rich Markdown format for professional readability
+- Multi-line input support (Shift+Enter for new lines)
+- Automatic model selection: uses Azure OpenAI when configured, falls back to Google Gemini (`gemini-2.5-flash`)
+- Backend `/api/chat/` endpoint handles message routing, history management, and model invocation
+- System prompt is tailored for financial document analysis (loan applications and tax returns)
+- Document context is truncated to the first 3,000 characters per document to stay within token limits
+
+**Acceptance Criteria:**
+- Chatbot button appears only on the Results page when processed document data exists
+- Chat window opens/closes smoothly on button click
+- User can type a message and receive an AI-generated response relevant to the uploaded document(s)
+- Chatbot correctly identifies whether single-document or dual-document context is active and adjusts its title accordingly ("Document Assistant" vs. "Dual Document Assistant")
+- Responses are rendered with proper Markdown formatting (bold, lists, code blocks)
+- Typing indicator displays animated dots while the AI is generating a response
+- Input is disabled during response generation to prevent duplicate requests
+- Chat history is preserved across window open/close within the same session
+- Graceful error handling with user-friendly error messages if the AI backend is unavailable
+
+**Benefits:**
+- Reduces time spent manually reviewing extracted data by enabling natural-language queries
+- Provides on-demand guidance without requiring users to leave the results workflow
+- Supports cross-document analysis for dual-document uploads (e.g., "Compare the borrower address on the loan with the taxpayer address")
+- Improves user confidence and reduces errors by offering AI-assisted verification
+
+### FR-012: Batch Document Processing
+**Priority:** High  
+**Description:** Enable users to upload and process multiple documents (Loan Application and Tax Return) together in a single workflow, replacing the previous separate upload areas with a unified multi-file upload interface.
+
+**Feature Description:**  
+Batch Document Processing allows users to upload two or more PDF documents through a single drag-and-drop zone. The system processes the uploaded documents in parallel—extracting text and invoking the selected LLM for each—and presents combined results on a unified Results page with tabbed navigation between document types.
+
+**Functional Changes:**
+- **Unified Upload Zone:** Single drag-and-drop area replaces the previous dual (Loan / Tax) upload sections; no document-type section headings are displayed
+- **Multi-File Selection:** Users can select or drag multiple PDFs at once; files are listed below the drop zone with filename, size, and individual remove buttons
+- **File Validation:** PDF-only, max 10 MB per file, duplicate-name detection, maximum of 10 files per upload session
+- **Automatic Document Mapping:** The first uploaded file is mapped as the Loan Application and the second as the Tax Return for backend processing compatibility
+- **Parallel Backend Processing:** Backend `/api/extract/` endpoint receives `loan_file` and `tax_file` form fields and processes both documents independently using the selected LLM
+- **Combined Results:** Results page provides tabbed navigation (Loan Application / Tax Return) to view extracted entities for each document, plus dual-document chatbot context
+- **Processing Feedback:** Processing page displays progress for both documents simultaneously with status messages
+- **Step Indicator:** Progress steps update dynamically based on file count (Step 1 at ≥1 file, Step 2 at model selection, Step 3 at ≥2 files ready to process)
+
+**Acceptance Criteria:**
+- Upload page displays a single, centered drop zone without document-type labels
+- Users can drag-and-drop or click-to-browse for multiple PDFs simultaneously
+- Uploaded files appear in a list with filename, formatted file size, and individual remove (X) buttons
+- "Extract Entities" button is disabled until at least 2 documents are uploaded
+- Duplicate filenames are silently skipped; non-PDF files show a clear error message
+- Files exceeding 10 MB display a specific size-limit error
+- Processing page shows combined progress for both documents
+- Results page displays extracted entities for Loan and Tax documents in separate tabs
+- Export includes data from all processed documents
+
+**Benefits:**
+- Streamlines the upload workflow by eliminating the need to categorize documents manually
+- Reduces user confusion—no need to determine which upload area to use for which document
+- Enables cross-document analysis through the dual-document chatbot assistant
+- Supports future extensibility to additional document types beyond loan and tax
+
+### FR-013: UI Enhancements
+**Priority:** High  
+**Description:** Improve the overall user interface for better usability, modern aesthetics, and seamless integration of new features (chatbot, batch uploads, export).
+
+**Feature Description:**  
+UI Enhancements encompass a set of visual and interaction improvements across all application screens to support the newly added features and align the interface with the design standards defined in Section 6 of this document.
+
+**Functional Changes:**
+- **Sidebar Navigation:** Persistent sidebar with Dashboard and Upload links, active-state highlighting, and responsive collapse for mobile viewports
+- **Results Page Layout:** Two-panel layout (60% entities / 40% PDF viewer) with tabbed document switching for dual-document results; nested section rendering for complex data structures (e.g., Taxpayer Information displayed with grouped sub-sections instead of flattened text)
+- **Taxpayer Information Display:** Each taxpayer is rendered as a numbered card ("Taxpayer 1", "Taxpayer 2") with grouped sub-sections (Taxpayer Information, Filing Information) containing structured field-value pairs
+- **Chatbot Integration Point:** Floating action button positioned at bottom-right with z-index layering to stay above page content; visible only on the Results page
+- **Authentication Screen:** Login page with branded header and session-based authentication using `sessionStorage`
+- **Breadcrumb Navigation:** Contextual breadcrumbs on all pages reflecting the current location within the application hierarchy
+- **Step Indicator on Upload:** Visual three-step progress indicator (Upload Files → Choose Model → Confirm) with dynamic active-state based on upload progress
+- **Error & Empty States:** Inline error banners for validation failures; empty-state guidance on the Results page when no data is available
+- **Consistent Design Tokens:** Color palette (#2563EB primary blue, #10B981 success green, #EF4444 error red), Inter font stack, 8px spacing grid applied uniformly across all pages
+
+**Acceptance Criteria:**
+- All pages follow the defined design system (colors, typography, spacing, component styles)
+- Sidebar navigation highlights the active page and is accessible via keyboard
+- Results page correctly renders nested entity objects as grouped sub-sections with field-value pairs instead of concatenated text strings
+- Chatbot button is visible and functional on the Results page; hidden on all other pages
+- Breadcrumbs accurately reflect the page hierarchy on every screen
+- All interactive elements have visible hover, focus, and active states
+- Application is responsive on desktop (≥1024px), tablet (768–1023px), and mobile (<768px)
+- No console errors across all supported browsers
+
+**Benefits:**
+- Improves information readability, particularly for complex multi-field entities like taxpayer details
+- Provides clear visual hierarchy and navigation, reducing cognitive load
+- Supports seamless discovery and use of new features (chatbot, batch upload, export)
+- Aligns the application with modern SaaS UI standards for a professional appearance
+
+### FR-014: Export Functionality
+**Priority:** High  
+**Description:** Provide a comprehensive export capability allowing users to download processed extraction results in multiple formats directly from the Results page.
+
+**Feature Description:**  
+The Export feature enables one-click download of extracted entity data from the Results page. The current implementation supports JSON export generated entirely on the client side. The roadmap includes additional formats (CSV, Excel/XLSX, PDF report) as defined in FR-010.
+
+**Functional Changes:**
+- **Export Button:** Prominent export button with download icon in the document header action bar on the Results page
+- **JSON Export (Implemented):**
+  - Single-document mode: exports the `entities` object as formatted JSON; file named `{fileName}_extracted.json`
+  - Dual-document mode: exports the full `result.documents` object containing both `loan` and `tax` sub-documents; file named `dual_documents_extracted.json`
+  - Generated entirely client-side using `Blob` and `URL.createObjectURL`—no server round-trip required
+- **Excel Export (Planned per FR-010):** Multi-sheet `.xlsx` workbook with formatted headers, auto-sized columns, and number formatting using SheetJS
+- **CSV Export (Planned):** Flat field-value export per entity category
+- **PDF Report (Planned):** Formatted summary report suitable for printing or archival
+
+**Acceptance Criteria:**
+- Export button is clearly visible and accessible in the Results page header alongside Edit and Delete actions
+- Clicking the export button triggers an immediate file download in the user's browser
+- JSON export accurately represents all extracted entity data, properly formatted with 2-space indentation
+- Dual-document exports include data from both Loan and Tax documents in a single file
+- Export works correctly regardless of the LLM model used (OpenAI or Gemini)
+- No data loss or corruption in exported files; special characters are properly handled
+- Export button is keyboard accessible with appropriate ARIA labeling
+
+**Benefits:**
+- Enables offline review and sharing of extraction results with stakeholders
+- Supports integration with downstream workflows (e.g., importing JSON into other systems)
+- Client-side generation ensures fast downloads without server dependency
+- Dual-document export consolidates all results into a single downloadable artifact
+
 ---
 
 ## 6. UI/UX Requirements
@@ -389,22 +538,33 @@ The GenAI PDF Extractor is a Django-based web application that extracts structur
 ```
 GenAI PDF Extractor
 │
+├── Login
+│   └── Session-based Authentication
+│
 ├── Dashboard (Home)
 │   ├── Quick Upload Section
 │   ├── Recent Documents Widget
 │   └── Statistics Overview
 │
-├── Upload Document
-│   ├── File Selection (Drag & Drop)
-│   ├── Model Selection
-│   ├── File Preview
-│   └── Processing Status
+├── Upload Documents (Batch)
+│   ├── Unified Multi-File Drop Zone (Loan + Tax)
+│   ├── File List with Add/Remove
+│   ├── Model Selection (OpenAI / Gemini)
+│   └── Step Progress Indicator
+│
+├── Processing Status
+│   ├── Dual-Document Progress
+│   ├── Status Messages per Document
+│   └── Retry / Change Model Options
 │
 ├── Results/Output
-│   ├── Extracted Entities Display
+│   ├── Tabbed Document View (Loan / Tax)
+│   ├── Extracted Entities Display (Cards & Tables)
+│   ├── Nested Section Rendering (e.g., Taxpayer Info)
 │   ├── PDF Viewer (Side-by-side)
+│   ├── AI Chatbot Assistant (Floating)
 │   ├── Edit Entities
-│   └── Export Options
+│   └── Export Options (JSON, CSV, Excel, PDF)
 │
 ├── Document History
 │   ├── List/Grid View
@@ -418,38 +578,38 @@ GenAI PDF Extractor
 
 ### 7.2 User Journey Flows
 
-#### 7.2.1 Primary Flow: Upload and Extract Entities
+#### 7.2.1 Primary Flow: Batch Upload and Extract Entities
 
 ```
-1. User lands on Dashboard
+1. User logs in and lands on Dashboard
    ↓
 2. Clicks "Upload New Document" button
    ↓
-3. Arrives at Upload page
+3. Arrives at Upload page (single unified drop zone)
    ↓
-4. Drags PDF file or clicks to browse
+4. Drags/drops multiple PDFs (Loan Application + Tax Return) or clicks to browse
    ↓
-5. File validates successfully (visual confirmation)
+5. Files validate successfully (type, size); listed below drop zone
    ↓
 6. Selects LLM model (OpenAI or Gemini)
    ↓
-7. Reviews file preview
+7. Clicks "Extract Entities" (enabled when ≥2 files uploaded)
    ↓
-8. Clicks "Extract Entities" button
+8. Redirected to Processing Status page
    ↓
-9. Redirected to Processing Status page
+9. Watches dual-document processing progress
    ↓
-10. Watches real-time progress (Upload → Extract → AI Process)
+10. Auto-redirected to Results page upon completion
     ↓
-11. Auto-redirected to Results page upon completion
+11. Reviews extracted entities via tabbed document view (Loan / Tax)
     ↓
-12. Reviews extracted entities in structured format
+12. Views original PDF in side panel
     ↓
-13. Views original PDF in side panel
+13. [Optional] Uses AI Chatbot to ask questions about the documents
     ↓
-14. [Optional] Edits incorrect entities
+14. [Optional] Edits incorrect entities inline
     ↓
-15. [Optional] Exports results (JSON/CSV/PDF)
+15. [Optional] Exports results (JSON; CSV/Excel/PDF planned)
     ↓
 16. Clicks "Process Another Document" or returns to Dashboard
 ```
@@ -534,29 +694,31 @@ GenAI PDF Extractor
 └──────────────────┴──────────────────┴───────────────────┘
 ```
 
-### 8.2 Upload Document Page
+### 8.2 Upload Documents Page (Batch)
 
-**Layout:** Centered single-column layout with step indicators
+**Layout:** Centered single-column layout with step indicators and unified multi-file upload zone
 
 **Sections:**
 1. **Progress Indicator**
-   - Step 1: Select File → Step 2: Choose Model → Step 3: Confirm
+   - Step 1: Upload Files → Step 2: Choose Model → Step 3: Confirm
+   - Steps activate dynamically based on file count and readiness
 
-2. **File Upload Area**
-   - Large drag-and-drop zone with dashed border
-   - "Drag & drop your PDF here or click to browse"
-   - File type and size restrictions displayed
-   - Selected file preview with filename, size, thumbnail
+2. **Unified File Upload Area**
+   - Single large drag-and-drop zone (no document-type section headings)
+   - "Drop your documents here or click to browse · PDF only · Max 10 MB each"
+   - Supports multi-file selection in a single interaction
+   - File list displayed below the drop zone with filename, formatted size, and individual remove buttons
+   - Maximum of 10 files per upload session
+   - Duplicate-name detection and non-PDF rejection with inline error messages
 
 3. **Model Selection**
-   - Radio button group or card selection
-   - Each model with description and use case
-   - OpenAI: "Fast and accurate for standard documents"
-   - Gemini: "Advanced processing for complex layouts"
+   - Card-based selection (radio)
+   - OpenAI GPT: "Fast and accurate for standard documents"
+   - Google Gemini: "Advanced processing for complex layouts"
 
 4. **Action Buttons**
-   - "Extract Entities" (primary button, disabled until file selected)
-   - "Cancel" (secondary button)
+   - "Extract Entities" (primary button, disabled until ≥2 files uploaded)
+   - "Cancel" (secondary button, returns to Dashboard)
 
 **Wireframe Description:**
 ```
@@ -564,23 +726,26 @@ GenAI PDF Extractor
 │  [Logo]  Dashboard  Upload  History        [User] [⬆️]  │
 ├─────────────────────────────────────────────────────────┤
 │                                                          │
-│  Upload Document                                         │
+│  Upload Documents                                        │
+│  Upload your loan application and tax return documents   │
 │  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
-│  Step 1: Select File  →  Step 2: Choose Model  →  Step 3│
+│  Step 1: Upload Files → Step 2: Choose Model → Step 3   │
 │                                                          │
 │  ┌────────────────────────────────────────────────────┐ │
 │  │                                                    │ │
-│  │         📄  Drag & drop your PDF here            │ │
-│  │              or click to browse                   │ │
+│  │         📄  Drop your documents here              │ │
+│  │     or click to browse · PDF only · Max 10MB      │ │
 │  │                                                    │ │
-│  │     Accepted: PDF files up to 10MB               │ │
 │  └────────────────────────────────────────────────────┘ │
 │                                                          │
-│  Selected: loan_application.pdf (2.3 MB) ✓              │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │ 📄 loan_application.pdf       2.3 MB         [✕]  │ │
+│  │ 📄 tax_return_2024.pdf        1.8 MB         [✕]  │ │
+│  └────────────────────────────────────────────────────┘ │
 │                                                          │
 │  Choose AI Model:                                        │
-│  ○ OpenAI GPT-3.5  (Fast, reliable extraction)         │
-│  ● Gemini 2.5 Pro  (Advanced, complex documents)       │
+│  ○ OpenAI GPT       (Fast, reliable extraction)         │
+│  ● Google Gemini    (Advanced, complex documents)       │
 │                                                          │
 │  [Cancel]                    [Extract Entities ➜]       │
 └─────────────────────────────────────────────────────────┘
@@ -734,6 +899,23 @@ GenAI PDF Extractor
 │                                  │                      │
 │ [← Back to History]              │                      │
 │ [Process Another Document ➜]    │                      │
+│                                  │                      │
+│ ┌────────────────────────────┐  │                      │
+│ │ 💬 AI Chatbot (Floating)   │  │                      │
+│ │ ┌──────────────────────┐   │  │                      │
+│ │ │ Document Assistant    │   │  │                      │
+│ │ ├──────────────────────┤   │  │                      │
+│ │ │ 🤖 How can I help?   │   │  │                      │
+│ │ │                      │   │  │                      │
+│ │ │ 👤 What is the       │   │  │                      │
+│ │ │    borrower name?    │   │  │                      │
+│ │ │                      │   │  │                      │
+│ │ │ 🤖 The borrower is   │   │  │                      │
+│ │ │    John Doe, as...   │   │  │                      │
+│ │ ├──────────────────────┤   │  │                      │
+│ │ │ [Type a message... ] │   │  │                      │
+│ │ └──────────────────────┘   │  │                      │
+│ └────────────────────────────┘  │                      │
 └──────────────────────────────────┴──────────────────────┘
 ```
 
@@ -824,9 +1006,11 @@ GenAI PDF Extractor
 - [ ] Toggle between Card View and Table View works seamlessly without data loss
 - [ ] Table View supports inline editing, quick-search filtering, and sticky headers
 - [ ] PDF viewer allows zoom, page navigation, and full-screen
-- [ ] Export functionality works for JSON, CSV, and Excel (.xlsx) formats
-- [ ] Excel export generates a multi-sheet workbook with formatted headers, auto-sized columns, and correct number formatting
-- [ ] Excel file downloads with the naming pattern `{document_name}_entities_{date}.xlsx`
+- [ ] Export functionality works for JSON format (CSV, Excel, PDF planned)
+- [ ] AI Chatbot appears on Results page and responds to document-related queries
+- [ ] Chatbot supports both single-document and dual-document conversation context
+- [ ] Batch upload allows multiple PDFs via a single unified drop zone
+- [ ] At least 2 documents required before extraction can proceed
 - [ ] Document history displays all processed documents
 - [ ] Search and filter work correctly in history view
 - [ ] Edit functionality allows inline entity corrections
@@ -1097,6 +1281,7 @@ genai_pdf_extractor/
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | March 9, 2026 | Product Team | Initial BRD creation |
+| 2.0 | March 10, 2026 | Product Team | Added AI Chatbot Integration (FR-011), Batch Document Processing (FR-012), UI Enhancements (FR-013), Export Functionality (FR-014); updated scope, navigation flow, screen structures, and acceptance criteria |
 
 ---
 

@@ -4,14 +4,14 @@
 
 This document provides comprehensive visual models representing the GenAI PDF Extractor system architecture and behavior. The diagrams are derived from functional requirements in `spec.md` and architectural decisions in `design.md`. These models serve multiple purposes:
 
-- **System Context Diagram**: Illustrates the system boundary and external interactions with users and LLM services
-- **Component Architecture Diagram**: Details the hybrid React + Django architecture with presentation, business, and data layers
+- **System Context Diagram**: Illustrates the system boundary and external interactions with users, LLM services, and Azure OpenAI chatbot service
+- **Component Architecture Diagram**: Details the hybrid React + Django architecture with presentation, business, and data layers — including AI chatbot and batch upload components
 - **Deployment Architecture Diagram**: Shows the deployment topology for the web application
-- **Data Flow Diagram**: Traces data movement from PDF upload through LLM processing to result display
+- **Data Flow Diagram**: Traces data movement from PDF upload (single or dual-document) through LLM processing to result display and chatbot interaction
 - **Logical Data Model (ERD)**: Defines database entities and relationships for document management and extraction results
-- **Use Case Sequence Diagrams**: Provides detailed interaction flows for each use case (UC-001 through UC-004)
+- **Use Case Sequence Diagrams**: Provides detailed interaction flows for each use case (UC-001 through UC-005)
 
-These diagrams align with the modernization goals: transforming a minimal single-page Django application into a professional multi-page React SPA with enhanced UI/UX while maintaining backward compatibility with existing backend infrastructure.
+These diagrams align with the modernization goals: transforming a minimal single-page Django application into a professional multi-page React SPA with AI chatbot integration, unified multi-document upload, dual-document extraction, and enhanced UI/UX while maintaining backward compatibility with existing backend infrastructure.
 
 ---
 
@@ -41,23 +41,29 @@ rectangle "GenAI PDF Extractor\nSystem" as System <<system>> {
 
 rectangle "OpenAI GPT API\n(gpt-3.5-turbo)" as OpenAI <<external>>
 rectangle "Google Gemini API\n(2.5-flash)" as Gemini <<external>>
+rectangle "Azure OpenAI API\n(Chatbot Service)" as AzureAI <<external>>
 rectangle "Browser Storage\n(localStorage)" as Browser <<external>>
 
-FA -down-> Frontend : Upload PDF,\nView Results,\nExport Data
+FA -down-> Frontend : Upload PDFs,\nView Results,\nChat with AI,\nExport Data
 SA -down-> Backend : Configure Settings,\nMonitor Performance
 QA -down-> Frontend : Test Features,\nValidate Accessibility
 
-Frontend -down-> Backend : API Requests\n(REST/JSON)
+Frontend -down-> Backend : API Requests\n(REST/JSON)\n(/api/extract/, /api/chat/)
 Backend -down-> DB : Store/Retrieve\nDocuments & Results
 Backend -right-> OpenAI : Extract Entities\n(Text → JSON)
-Backend -right-> Gemini : Extract Entities\n(Text → JSON)
+Backend -right-> Gemini : Extract Entities\n(Text → JSON)\n& Chatbot Fallback
+Backend -right-> AzureAI : Chatbot Service\n(Primary)
 Frontend -up-> Browser : Cache Preferences,\nSession Data
 
 note right of System
   **System Boundary:**
   - React SPA handles all UI rendering
+    including AI chatbot overlay
   - Django manages file storage, 
-    LLM integration, data persistence
+    LLM integration, data persistence,
+    and chatbot API (/api/chat/)
+  - Unified multi-file upload with 
+    dual-document processing
   - Hybrid architecture maintains
     backward compatibility
 end note
@@ -75,21 +81,25 @@ flowchart LR
         direction TB
         Router["React Router\n(Client-Side Routing)"]
         Dashboard["Dashboard\nComponent"]
-        Upload["Upload Workflow\nComponent"]
-        Results["Results Display\nComponent"]
+        Upload["Upload Workflow\nComponent\n(Unified Multi-File)"]
+        Processing["Processing Status\nComponent\n(Dual-Doc Aware)"]
+        Results["Results Display\nComponent\n(Dual-Doc Tabs)"]
         History["Document History\nComponent"]
+        Chatbot["AI Chatbot\nOverlay Component"]
         
         Router --> Dashboard
         Router --> Upload
+        Router --> Processing
         Router --> Results
         Router --> History
+        Results --> Chatbot
         
         subgraph UIComponents["Shared UI Components"]
             Navigation["Navigation Bar"]
-            FileUpload["Drag-Drop Upload\n(react-dropzone)"]
+            FileUpload["Unified Drop Zone\n(Multi-File Upload)"]
             PDFViewer["PDF Viewer\n(react-pdf)"]
             DataTable["Data Table\n(TanStack Table)"]
-            ExportModule["Export Module\n(SheetJS)"]
+            ExportModule["Export Module\n(JSON Download)"]
         end
         
         subgraph StateManagement["State Management"]
@@ -112,6 +122,7 @@ flowchart LR
         subgraph Views["ViewSets"]
             DocumentView["DocumentViewSet"]
             ExtractionView["ExtractionResultViewSet"]
+            ChatView["ChatView\n(/api/chat/)"]
         end
         
         subgraph Services["Business Logic"]
@@ -119,12 +130,15 @@ flowchart LR
             LLMIntegrator["LLM Integration Service"]
             OpenAIBackend["OpenAI Backend"]
             GeminiBackend["Gemini Backend"]
+            AzureOpenAIBackend["Azure OpenAI Backend\n(Chatbot Primary)"]
         end
         
         DRF --> Views
         Views --> Services
         LLMIntegrator --> OpenAIBackend
         LLMIntegrator --> GeminiBackend
+        ChatView --> AzureOpenAIBackend
+        ChatView --> GeminiBackend
     end
     
     subgraph Data["Data Layer"]
@@ -152,12 +166,15 @@ flowchart LR
     subgraph External["External Services"]
         OpenAI["OpenAI API\n(GPT-3.5-turbo)"]
         Gemini["Google Gemini API\n(2.5-flash)"]
+        AzureAI["Azure OpenAI API\n(Chatbot)"]
     end
     
     OpenAIBackend -->|"API Request\n(Text)"| OpenAI
     GeminiBackend -->|"API Request\n(Text)"| Gemini
+    AzureOpenAIBackend -->|"Chat Request\n(Messages)"| AzureAI
     OpenAI -->|"JSON Response\n(Entities)"| OpenAIBackend
     Gemini -->|"JSON Response\n(Entities)"| GeminiBackend
+    AzureAI -->|"Chat Response\n(Markdown)"| AzureOpenAIBackend
     
     classDef frontendStyle fill:#E3F2FD,stroke:#1976D2,stroke-width:2px
     classDef backendStyle fill:#E8F5E9,stroke:#388E3C,stroke-width:2px
@@ -215,12 +232,13 @@ node "File System" as FileSystem {
 cloud "External APIs" as ExternalAPIs {
     component "OpenAI API\n(gpt-3.5-turbo)" as OpenAI
     component "Google Gemini API\n(2.5-flash)" as Gemini
+    component "Azure OpenAI API\n(Chatbot)" as AzureAI
 }
 
 User --> Browser : HTTPS
 Admin --> Browser : HTTPS
 
-Browser --> WebServer : "HTTP/HTTPS\nREST API Calls\n(/api/*)"
+Browser --> WebServer : "HTTP/HTTPS\nREST API Calls\n(/api/extract/, /api/chat/)"
 Browser --> WebServer : "Static Asset Requests\n(*.js, *.css)"
 
 ReactApp ..> PDFWorker : "PDF Rendering"
@@ -319,16 +337,19 @@ note right of P4
   - OpenAI: gpt-3.5-turbo
   - Gemini: 2.5-flash
   - Returns structured JSON
-  - Categories: Lender, Borrower,
+  - Loan Categories: Lender, Borrower,
     Loan Terms, Location, Person
+  - Tax Categories: Taxpayer Info,
+    Filing Info, Income, Deductions,
+    Tax Calculations, Refund/Amount Due
 end note
 
 note right of P7
   **Export Formats:**
-  - JSON: Raw extraction data
-  - CSV: Flattened entities
-  - Excel: Multi-sheet workbook
-  - PDF: Formatted report
+  - JSON: Raw extraction data (implemented)
+  - CSV: Flattened entities (planned)
+  - Excel: Multi-sheet workbook (planned)
+  - PDF: Formatted report (planned)
 end note
 
 @enduml
@@ -780,19 +801,79 @@ sequenceDiagram
 
 ---
 
+### UC-005: Interact with AI Chatbot
+
+**Source**: [spec.md#UC-005](../spec.md#UC-005)
+
+```mermaid
+sequenceDiagram
+    participant FA as Financial Analyst
+    participant UI as Results Component
+    participant Chatbot as Chatbot Component
+    participant API as Django REST API
+    participant AzureAI as Azure OpenAI API
+    participant Gemini as Google Gemini API
+
+    Note over FA,Gemini: UC-005 - Interact with AI Chatbot on Results Page
+
+    FA->>UI: View extraction results on Results page
+    FA->>Chatbot: Click chatbot FAB (bottom-right)
+    Chatbot->>Chatbot: Open 380×520px overlay window
+    
+    alt Dual-document results
+        Chatbot-->>FA: Display title "Dual Document Assistant"
+        Chatbot->>Chatbot: Build context with loan + tax extraction data
+    else Single-document results
+        Chatbot-->>FA: Display title "Document Assistant"
+        Chatbot->>Chatbot: Build context with single document extraction data
+    end
+
+    FA->>Chatbot: Type question "What is the loan amount?"
+    FA->>Chatbot: Press Enter to send
+    Chatbot->>Chatbot: Add user message to conversation history
+    Chatbot-->>FA: Display user message in chat window
+    Chatbot-->>FA: Show typing indicator
+
+    Chatbot->>API: POST /api/chat/ {message, history, context}
+    
+    alt Azure OpenAI available
+        API->>AzureAI: Send chat request with system prompt + context + history
+        AzureAI-->>API: Chat response (Markdown)
+        API-->>Chatbot: 200 OK {response}
+    else Azure OpenAI unavailable (fallback)
+        API->>Gemini: Send chat request via Gemini 2.5-flash
+        Gemini-->>API: Chat response (Markdown)
+        API-->>Chatbot: 200 OK {response}
+    end
+
+    Chatbot->>Chatbot: Hide typing indicator
+    Chatbot->>Chatbot: Render response with ReactMarkdown
+    Chatbot->>Chatbot: Maintain rolling history (last 10 messages)
+    Chatbot-->>FA: Display AI response in chat window
+
+    FA->>Chatbot: Ask follow-up question (Shift+Enter for multiline)
+    Note over Chatbot: Repeat message flow with updated history
+
+    FA->>Chatbot: Click FAB again to close
+    Chatbot->>Chatbot: Close overlay (preserve history in state)
+```
+
+---
+
 ## Diagram Summary
 
 | Diagram Type | Purpose | Key Insights |
 |--------------|---------|--------------|
-| **System Context** | Shows system boundary and external actors | Hybrid architecture with React frontend, Django backend, and external LLM APIs (OpenAI/Gemini) |
-| **Component Architecture** | Details internal component structure | Clear separation: Presentation (React), Business (Django), Data (SQLite) layers with shared UI components and state management |
+| **System Context** | Shows system boundary and external actors | Hybrid architecture with React frontend, Django backend, and external LLM APIs (OpenAI, Gemini, Azure OpenAI for chatbot) |
+| **Component Architecture** | Details internal component structure | Clear separation: Presentation (React with Chatbot overlay), Business (Django with /api/chat/), Data (SQLite) layers with shared UI components and state management |
 | **Deployment** | Illustrates deployment topology | Single-server deployment with Django serving both APIs and static files via WhiteNoise; no separate Node.js server required |
-| **Data Flow** | Traces data movement through system | 7-step process: Upload → Validate → Extract Text → LLM Processing → Store → Display/Edit → Export |
+| **Data Flow** | Traces data movement through system | 7-step process: Upload → Validate → Extract Text → LLM Processing → Store → Display/Edit → Export; plus chatbot flow via /api/chat/ |
 | **ERD** | Defines database schema | 5 core entities: User, Document, ExtractionResult, EntityEdit, UserPreference with clear relationships and audit trail |
-| **UC-001 Sequence** | Upload and process workflow | Multi-step async flow with validation, LLM integration, error handling, and status polling |
-| **UC-002 Sequence** | View and edit results | Parallel PDF loading, inline editing with optimistic updates, view toggling (Card/Table), and real-time validation |
-| **UC-003 Sequence** | Export functionality | Client-side Excel generation with SheetJS, multi-sheet workbooks, formatting, and alternative export formats (JSON/CSV/PDF) |
+| **UC-001 Sequence** | Upload and process workflow | Unified multi-file upload, dual-document detection, async flow with validation, LLM integration, error handling, and status polling |
+| **UC-002 Sequence** | View and edit results | Parallel PDF loading, dual-doc tab navigation, inline editing with optimistic updates, view toggling (Card/Table), and real-time validation |
+| **UC-003 Sequence** | Export functionality | Client-side JSON export with Blob API download; planned support for CSV, Excel (SheetJS), and PDF report formats |
 | **UC-004 Sequence** | Document history management | Advanced filtering, search, sorting, pagination, soft delete with confirmation, and empty state handling |
+| **UC-005 Sequence** | AI Chatbot interaction | Floating chatbot on Results page, Azure OpenAI primary with Gemini fallback, dual-doc context awareness, Markdown rendering, rolling 10-message history |
 
 ---
 

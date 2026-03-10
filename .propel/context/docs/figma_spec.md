@@ -26,7 +26,7 @@
 
 ## 3. UX Requirements
 
-*Generated based on use cases UC-001 through UC-004 with UI impact. These requirements apply to all screen implementations.*
+*Generated based on use cases UC-001 through UC-005 with UI impact. These requirements apply to all screen implementations.*
 
 ### UXR Requirements Summary Table
 
@@ -159,15 +159,15 @@ GenAI PDF Extractor
 
 ## 6. Screen Inventory
 
-*All screens derived from use cases UC-001 through UC-004 in spec.md*
+*All screens derived from use cases UC-001 through UC-005 in spec.md*
 
 ### Screen List
 | Screen ID | Screen Name | Derived From | Personas Covered | Priority | States Required |
 |-----------|-------------|--------------|------------------|----------|-----------------|
 | SCR-001 | Dashboard/Home | FR-007 to FR-012, UC-001 entry | Financial Analyst (Primary) | P0 | Default, Loading, Empty, Error, N/A |
-| SCR-002 | Document Upload | UC-001 steps 2-6, FR-013 to FR-023 | Financial Analyst (Primary) | P0 | Default, Loading, Error, Validation, Success |
-| SCR-003 | Processing Status | UC-001 steps 7-9, FR-024 to FR-026 | Financial Analyst (Primary) | P0 | Loading, Success, Error, N/A, N/A |
-| SCR-004 | Results/Output Display | UC-001 step 11, UC-002, FR-032 to FR-053 | Financial Analyst (Primary) | P0 | Default, Loading, Empty, Error, N/A |
+| SCR-002 | Document Upload | UC-001 steps 2-6, FR-013 to FR-023, FR-127 | Financial Analyst (Primary) | P0 | Default, Loading, Error, Validation, Success |
+| SCR-003 | Processing Status | UC-001 steps 7-9, FR-024 to FR-026, FR-132 | Financial Analyst (Primary) | P0 | Loading, Success, Error, N/A, N/A |
+| SCR-004 | Results/Output Display | UC-001 step 11, UC-002, UC-005, FR-032 to FR-053, FR-117 to FR-132 | Financial Analyst (Primary) | P0 | Default, Loading, Empty, Error, N/A |
 | SCR-005 | Document History | UC-004, FR-069 to FR-078 | Financial Analyst (Primary) | P0 | Default, Loading, Empty, Error, N/A |
 
 ### Priority Legend
@@ -188,6 +188,7 @@ GenAI PDF Extractor
 ### Modal/Overlay Inventory
 | Name | Type | Trigger | Parent Screen(s) | Priority |
 |------|------|---------|-----------------|----------|
+| AI Chatbot | Overlay (380×520px) | Click FAB (bottom-right) | SCR-004 (Results) | P0 |
 | Delete Confirmation | Dialog | Click delete icon on document | SCR-005 (History) | P0 |
 | Export Options Menu | Dropdown | Click "Export" button | SCR-004 (Results) | P0 |
 | File Validation Error | Toast | Invalid file upload | SCR-002 (Upload) | P0 |
@@ -384,41 +385,43 @@ Landing page providing quick access to upload functionality, recent document act
 **Priority**: P0
 
 #### Purpose
-Step-by-step guided workflow for uploading PDF documents, selecting LLM model, and initiating entity extraction.
+Unified multi-file upload workflow for uploading one or more PDF documents (loan applications and/or tax return forms), selecting LLM model, and initiating entity extraction.
 
 #### Layout Structure
 **Desktop (≥1024px)**:
 - Fixed header with breadcrumb: "Home > Upload Document"
-- Centered form container (max-width: 800px)
-- Step indicator at top: Step 1 (Select File) → Step 2 (Choose Model) → Step 3 (Confirm)
-- Drag-and-drop zone (large, prominent)
+- Centered form container (max-width: 640px)
+- Single unified drag-and-drop zone (large, prominent, no section headings)
+- File list below drop zone (showing uploaded files with remove buttons)
 - Model selection cards (2 cards side-by-side)
 - Action buttons at bottom (Cancel, Extract Entities)
 
 **Tablet (768px-1023px)**:
-- Same as desktop, slightly narrower container (max-width: 700px)
+- Same as desktop, slightly narrower container (max-width: 600px)
 
 **Mobile (<768px)**:
 - Stacked layout
-- Step indicator (horizontal dots)
 - Drag-and-drop zone (full width)
+- File list (full width)
 - Model selection cards (stacked vertically)
 - Action buttons (full width, stacked)
 
 #### Content Elements
 1. **Page Title**: "Upload Document" (H1)
-2. **Step Indicator**: Visual progress (Step 1/3, Step 2/3, Step 3/3)
-3. **Drag-and-Drop Zone**:
-   - Large dashed border area
+2. **Unified Drag-and-Drop Zone**:
+   - Large dashed border area (single zone, no section labels)
    - Upload icon (centered)
-   - Text: "Drag and drop your PDF file here, or click to browse"
-   - Subtext: "Maximum file size: 10MB"
-4. **File Preview** (after selection):
-   - Filename with PDF icon
-   - File size
-   - Thumbnail (if available)
-   - Remove button (X icon)
-5. **Model Selection**:
+   - Text: "Drag and drop your PDF files here, or click to browse"
+   - Subtext: "Upload loan application and tax return documents. Maximum 10MB per file."
+3. **File List** (after file selection):
+   - List of uploaded files, each showing:
+     - PDF icon
+     - Filename
+     - File size
+     - Remove button (X icon) per file
+   - First file mapped as loan document, second file as tax return form
+   - Support up to 10 files per upload session
+4. **Model Selection**:
    - Heading: "Choose LLM Model" (H3)
    - Radio card 1: OpenAI GPT
      - Description: "Fast and accurate for standard documents"
@@ -426,15 +429,15 @@ Step-by-step guided workflow for uploading PDF documents, selecting LLM model, a
    - Radio card 2: Google Gemini
      - Description: "Advanced processing for complex layouts"
      - Icon: Gemini logo or AI icon
-6. **Action Buttons**:
+5. **Action Buttons**:
    - Cancel (secondary button)
-   - Extract Entities (primary button, disabled until file + model selected)
+   - Extract Entities (primary button, disabled until at least one file + model selected)
 
 #### States
 
 **Default State**:
 - Empty drag-and-drop zone
-- No file selected
+- No files in file list
 - Model selection visible but not selected
 - Extract button disabled
 
@@ -557,52 +560,60 @@ Intermediate state showing loading indicator while LLM processes the document an
 **Priority**: P0
 
 #### Purpose
-Primary work screen for reviewing extracted entity data, making manual corrections, viewing original PDF, and exporting results in multiple formats.
+Primary work screen for reviewing extracted entity data, making manual corrections, viewing original PDF, interacting with AI chatbot, and exporting results. Supports dual-document results with tab navigation when both loan and tax documents are processed.
 
 #### Layout Structure
 **Desktop (≥1024px)**:
 - Fixed header with breadcrumb: "Home > Results > [Document Name]"
 - Document info header (filename, date, model, actions)
+- Document tabs (when dual-doc): "Loan Application" | "Tax Return Form"
 - Side-by-side layout:
   - Left panel (60%): Entity display (card view or table view)
   - Right panel (40%): PDF viewer
 - Toggle switch for Card View ↔ Table View (top-left of entity panel)
 - Export dropdown button (top-right of entity panel)
+- AI Chatbot FAB (floating action button) at bottom-right corner
 
 **Tablet (768px-1023px)**:
 - Tabbed interface:
   - Tab 1: Entities (card/table view)
   - Tab 2: PDF Viewer
+- Document tabs above entity panel (when dual-doc)
 - Toggle and export buttons in entity tab
+- Chatbot FAB at bottom-right
 
 **Mobile (<768px)**:
 - Stacked layout:
   - Document info header
+  - Document tabs (when dual-doc)
   - Entities section (card view only, no table view on mobile)
   - PDF viewer section (collapsible accordion)
 - Export button (full width, sticky at bottom)
+- Chatbot FAB at bottom-right
 
 #### Content Elements
 1. **Document Info Header**:
    - Filename (H1, truncated with tooltip)
    - Metadata: Upload date, Model used, Processing time
    - Action buttons: Edit (icon), Export (dropdown), Delete (icon)
-2. **Entity Display Panel**:
+2. **Document Tabs** (dual-document only):
+   - Tab 1: "Loan Application" — switches entity panel to loan extraction data
+   - Tab 2: "Tax Return Form" — switches entity panel to tax extraction data
+3. **Entity Display Panel**:
    - View toggle: Card View | Table View
-   - Entity categories (5 sections):
-     - Lender Information
-     - Borrower Details
-     - Loan Terms
-     - Location Data
-     - Person Information
+   - Entity categories vary by document type:
+     - **Loan Document** (5 sections): Lender Information, Borrower Details, Loan Terms, Location Data, Person Information
+     - **Tax Return** (6 sections): Taxpayer Information, Filing Information, Income Details, Deductions, Tax Calculations, Refund or Amount Due
+   - Nested objects render as grouped sub-sections (e.g., "Taxpayer 1", "Taxpayer 2") with structured field-value pairs
    - Each category as Card (card view) or Table (table view)
-3. **Card View** (default):
+4. **Card View** (default):
    - Each category in separate card component
    - Field label + extracted value pairs
+   - Nested object sub-sections with titled groupings
    - Confidence score badge (if available)
    - Click-to-edit inline editing
    - Empty fields show "--" placeholder
-4. **Table View**:
+5. **Table View**:
    - Each category as separate table
    - Columns: Field Name | Extracted Value
    - Sortable columns (click header)
@@ -610,16 +621,23 @@ Primary work screen for reviewing extracted entity data, making manual correctio
    - Sticky table headers
    - Row striping for readability
    - Click-to-edit inline editing
-5. **PDF Viewer Panel**:
+6. **PDF Viewer Panel**:
    - PDF rendering with react-pdf
    - Zoom controls: Zoom In, Zoom Out, Fit to Width, Fit to Page
    - Page navigation: Previous, Next, Page X of Y
    - Full-screen button
+7. **AI Chatbot Overlay** (toggled via FAB):
+   - FAB button: Chat icon at bottom-right (Primary Blue, 56px diameter)
+   - Overlay window: 380×520px, positioned above FAB
+   - Header: "Dual Document Assistant" (dual-doc) or "Document Assistant" (single-doc) with close button
+   - Scrollable message area: User messages (right-aligned) and AI responses (left-aligned, Markdown rendered)
+   - Typing indicator: Animated dots while waiting for AI response
+   - Input field: Text area with placeholder "Ask about your document...", Shift+Enter for multiline, Enter to send
 6. **Export Dropdown**:
-   - Download as JSON
-   - Download as CSV
-   - Download as Excel (.xlsx)
-   - Generate PDF Report
+   - Download as JSON (currently implemented)
+   - Download as CSV (planned)
+   - Download as Excel (.xlsx) (planned)
+   - Generate PDF Report (planned)
 
 #### States
 
@@ -653,6 +671,7 @@ Primary work screen for reviewing extracted entity data, making manual correctio
 
 #### Components Used
 - Header (navigation + breadcrumb)
+- Tabs (document tabs for dual-doc: Loan Application / Tax Return Form)
 - Card (entity category cards)
 - Table (entity category tables with TanStack Table)
 - Toggle (Card View ↔ Table View switch)
@@ -664,15 +683,19 @@ Primary work screen for reviewing extracted entity data, making manual correctio
 - SearchInput (table quick-search)
 - Toast (success/error notifications)
 - Skeleton (loading state)
+- FAB (floating action button for chatbot toggle)
+- ChatbotOverlay (380×520px overlay with header, messages, input)
+- ReactMarkdown (render AI responses)
 
 #### Interactions
 - Toggle Card View ↔ Table View → Switch display mode, preserve data and scroll position
+- Click document tab (dual-doc) → Switch entity panel between loan and tax extraction data
 - Click field value → Enter inline edit mode (text input appears)
 - Edit value → Press Enter or click outside → Save changes, show success toast
 - Click table header → Sort by that column (ascending/descending)
 - Type in quick-search → Filter table rows in real-time
-- Click Export → Show dropdown with 4 options
-- Click "Download as Excel" → Generate .xlsx file client-side, trigger download, show success toast
+- Click Export → Show dropdown with export options
+- Click "Download as JSON" → Generate JSON file client-side, trigger download
 - Click PDF zoom controls → Zoom in/out, fit to width/page
 - Click PDF page navigation → Navigate to previous/next page
 - Click Full-screen → Expand PDF viewer to full screen
