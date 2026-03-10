@@ -9,7 +9,7 @@ export default function Layout({ children, onLogout, uploadedDoc }) {
   return (
     <div className="layout">
       <header className="header">
-        <NavLink to="/" className="logo">GenAI PDF Extractor</NavLink>
+        <NavLink to="/" className="logo">Intelligent Loan Processing</NavLink>
         <nav className="nav">
           <NavLink to="/" end className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
             Dashboard

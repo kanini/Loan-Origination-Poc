@@ -8,7 +8,7 @@ export default function Dashboard() {
   return (
     <main className="dashboard">
       <div className="hero">
-        <h1>Welcome to GenAI PDF Extractor</h1>
+        <h1>Intelligent Loan Processing System</h1>
         <button className="cta-button" onClick={() => navigate('/upload')}>
           <Upload size={20} />
           Upload New Document
