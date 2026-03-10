@@ -183,6 +183,31 @@
   color: #D1D5DB;
 }
 
+.field-row-full {
+  grid-column: 1 / -1;
+}
+
+.entity-sub-card {
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.entity-sub-card:last-child {
+  margin-bottom: 0;
+}
+
+.sub-card-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #3B82F6;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #E5E7EB;
+}
+
 .raw-output {
   font-size: 13px;
   color: #374151;
@@ -262,6 +287,82 @@
   border: none;
 }
 
+/* Dual Document Tabs */
+.document-tabs {
+  display: flex;
+  gap: 16px;
+  padding: 16px 32px;
+  background: white;
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.doc-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: #F9FAFB;
+  border: 2px solid #E5E7EB;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 150ms ease-in-out;
+  text-align: left;
+}
+
+.doc-tab:hover {
+  border-color: #3B82F6;
+  background: #EFF6FF;
+}
+
+.doc-tab.active {
+  border-color: #3B82F6;
+  background: #EFF6FF;
+  box-shadow: 0 1px 3px 0 rgba(59, 130, 246, 0.1);
+}
+
+.doc-tab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: 700;
+  color: white;
+  flex-shrink: 0;
+}
+
+.doc-tab-icon.loan {
+  background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+}
+
+.doc-tab-icon.tax {
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+}
+
+.doc-tab-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.doc-tab-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.doc-tab-subtitle {
+  font-size: 13px;
+  color: #6B7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 1023px) {
   .results-main {
     grid-template-columns: 1fr;
@@ -280,6 +381,15 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 16px;
+  }
+
+  .document-tabs {
+    flex-direction: column;
+    padding: 12px 16px;
+  }
+
+  .doc-tab {
+    padding: 12px 16px;
   }
 
   .entity-panel {

@@ -8,32 +8,66 @@ export default function Processing({ uploadedDoc, setUploadedDoc }) {
   const navigate = useNavigate()
   const [state, setState] = useState('loading')
   const [errorMsg, setErrorMsg] = useState('')
+  const [processingStep, setProcessingStep] = useState('')
+
+  // Check if dual upload
+  const isDualUpload = uploadedDoc?.loanFile && uploadedDoc?.taxFile
 
   useEffect(() => {
-    if (!uploadedDoc?.file) {
+    // Check for both single and dual upload
+    if (!uploadedDoc?.file && !isDualUpload) {
       navigate('/upload')
       return
     }
 
+    let cancelled = false
+
     const processDocument = async () => {
       try {
-        const formData = new FormData()
-        formData.append('pdf_file', uploadedDoc.file)
-        formData.append('model', uploadedDoc.model)
+        if (isDualUpload) {
+          setProcessingStep('Processing both documents...')
+          const formData = new FormData()
+          formData.append('loan_file', uploadedDoc.loanFile)
+          formData.append('tax_file', uploadedDoc.taxFile)
+          formData.append('model', uploadedDoc.model)
 
-        const response = await axios.post('/api/extract/', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        })
+          const response = await axios.post('/api/extract/', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          })
 
-        setUploadedDoc((prev) => ({
-          ...prev,
-          result: response.data,
-          extractedText: response.data.extracted_text || '',
-        }))
+          if (cancelled) return
 
-        setState('success')
-        setTimeout(() => navigate('/results'), 1500)
+          setUploadedDoc((prev) => ({
+            ...prev,
+            result: response.data,
+            loanText: response.data.documents?.loan?.extracted_text || '',
+            taxText: response.data.documents?.tax?.extracted_text || '',
+          }))
+
+          setState('success')
+          setTimeout(() => navigate('/results'), 1500)
+        } else {
+          const formData = new FormData()
+          formData.append('pdf_file', uploadedDoc.file)
+          formData.append('model', uploadedDoc.model)
+
+          const response = await axios.post('/api/extract/', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          })
+
+          if (cancelled) return
+
+          setUploadedDoc((prev) => ({
+            ...prev,
+            result: response.data,
+            extractedText: response.data.extracted_text || '',
+          }))
+
+          setState('success')
+          setTimeout(() => navigate('/results'), 1500)
+        }
       } catch (err) {
+        if (cancelled) return
         setState('error')
         const msg = err.response?.data?.error || err.message || 'Unknown error occurred'
         setErrorMsg(msg)
@@ -41,33 +75,64 @@ export default function Processing({ uploadedDoc, setUploadedDoc }) {
     }
 
     processDocument()
+
+    return () => { cancelled = true }
   }, [])
 
   const handleRetry = () => {
     setState('loading')
     setErrorMsg('')
-    const formData = new FormData()
-    formData.append('pdf_file', uploadedDoc.file)
-    formData.append('model', uploadedDoc.model)
+    setProcessingStep('')
+    
+    if (isDualUpload) {
+      const formData = new FormData()
+      formData.append('loan_file', uploadedDoc.loanFile)
+      formData.append('tax_file', uploadedDoc.taxFile)
+      formData.append('model', uploadedDoc.model)
 
-    axios
-      .post('/api/extract/', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-      .then((response) => {
-        setUploadedDoc((prev) => ({
-          ...prev,
-          result: response.data,
-          extractedText: response.data.extracted_text || '',
-        }))
-        setState('success')
-        setTimeout(() => navigate('/results'), 1500)
-      })
-      .catch((err) => {
-        setState('error')
-        const msg = err.response?.data?.error || err.message || 'Unknown error occurred'
-        setErrorMsg(msg)
-      })
+      axios
+        .post('/api/extract/', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        .then((response) => {
+          setUploadedDoc((prev) => ({
+            ...prev,
+            result: response.data,
+            loanText: response.data.documents?.loan?.extracted_text || '',
+            taxText: response.data.documents?.tax?.extracted_text || '',
+          }))
+          setState('success')
+          setTimeout(() => navigate('/results'), 1500)
+        })
+        .catch((err) => {
+          setState('error')
+          const msg = err.response?.data?.error || err.message || 'Unknown error occurred'
+          setErrorMsg(msg)
+        })
+    } else {
+      const formData = new FormData()
+      formData.append('pdf_file', uploadedDoc.file)
+      formData.append('model', uploadedDoc.model)
+
+      axios
+        .post('/api/extract/', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        .then((response) => {
+          setUploadedDoc((prev) => ({
+            ...prev,
+            result: response.data,
+            extractedText: response.data.extracted_text || '',
+          }))
+          setState('success')
+          setTimeout(() => navigate('/results'), 1500)
+        })
+        .catch((err) => {
+          setState('error')
+          const msg = err.response?.data?.error || err.message || 'Unknown error occurred'
+          setErrorMsg(msg)
+        })
+    }
   }
 
   const modelLabel = uploadedDoc?.model === 'gemini' ? 'Google Gemini' : 'OpenAI GPT'
@@ -87,18 +152,32 @@ export default function Processing({ uploadedDoc, setUploadedDoc }) {
       {state === 'loading' && (
         <main className="processing-main">
           <div className="spinner"></div>
-          <h2>Processing your document...</h2>
+          <h2>{isDualUpload ? 'Processing your documents...' : 'Processing your document...'}</h2>
+          {processingStep && <p className="processing-step">{processingStep}</p>}
           <div className="processing-details">
-            <div className="detail-row">
-              <span className="detail-label">Filename</span>
-              <span className="detail-value">{uploadedDoc?.file?.name || 'N/A'}</span>
-            </div>
+            {isDualUpload ? (
+              <>
+                <div className="detail-row">
+                  <span className="detail-label">Loan Application</span>
+                  <span className="detail-value">{uploadedDoc?.loanFile?.name || 'N/A'}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Tax Return</span>
+                  <span className="detail-value">{uploadedDoc?.taxFile?.name || 'N/A'}</span>
+                </div>
+              </>
+            ) : (
+              <div className="detail-row">
+                <span className="detail-label">Filename</span>
+                <span className="detail-value">{uploadedDoc?.file?.name || 'N/A'}</span>
+              </div>
+            )}
             <div className="detail-row">
               <span className="detail-label">Model</span>
               <span className="detail-value">{modelLabel}</span>
             </div>
           </div>
-          <p className="subtext">This may take 10-30 seconds depending on document complexity</p>
+          <p className="subtext">This may take {isDualUpload ? '30-60' : '10-30'} seconds depending on document complexity</p>
         </main>
       )}
 

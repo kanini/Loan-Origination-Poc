@@ -13,6 +13,7 @@ const formatFieldName = (fieldName) => {
 export default function Results({ uploadedDoc }) {
   const navigate = useNavigate()
   const [viewMode, setViewMode] = useState('card')
+  const [activeDoc, setActiveDoc] = useState('loan') // 'loan' or 'tax'
 
   if (!uploadedDoc?.result) {
     return (
@@ -27,18 +28,89 @@ export default function Results({ uploadedDoc }) {
   }
 
   const { result } = uploadedDoc
-  const entities = result.entities || {}
-  const modelLabel = result.model === 'gemini' ? 'Google Gemini' : 'OpenAI GPT'
+  
+  // Check if this is dual document result
+  const isDualDoc = result.documents && result.documents.loan && result.documents.tax
+  
+  // Get entities based on document type
+  let entities, fileName, fileUrl, modelLabel
+  
+  if (isDualDoc) {
+    const docData = result.documents[activeDoc]
+    entities = docData?.entities || {}
+    fileName = docData?.file_name || (activeDoc === 'loan' ? 'Loan Application' : 'Tax Return')
+    fileUrl = docData?.file_url
+    modelLabel = result.model === 'gemini' ? 'Google Gemini' : 'OpenAI GPT'
+  } else {
+    entities = result.entities || {}
+    fileName = result.file_name
+    fileUrl = result.file_url
+    modelLabel = result.model === 'gemini' ? 'Google Gemini' : 'OpenAI GPT'
+  }
 
   const handleExport = () => {
-    const dataStr = JSON.stringify(entities, null, 2)
+    const exportData = isDualDoc ? result.documents : entities
+    const dataStr = JSON.stringify(exportData, null, 2)
     const blob = new Blob([dataStr], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${result.file_name || 'entities'}_extracted.json`
+    a.download = isDualDoc ? 'dual_documents_extracted.json' : `${fileName}_extracted.json`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  // Helper: render a value that could be a primitive, array, or nested object
+  const renderValue = (value) => {
+    if (value === null || value === undefined) return 'N/A'
+    if (typeof value !== 'object') return String(value)
+    if (Array.isArray(value)) {
+      // Array of primitives (e.g. ["12/31/2021", "12/31/2020"])
+      if (value.length === 0) return 'N/A'
+      if (typeof value[0] !== 'object') return value.join(', ')
+      // Array of objects – render nothing here (handled by renderArrayOfObjects)
+      return null
+    }
+    // Nested object – flatten inline
+    return Object.entries(value)
+      .map(([k, v]) => `${formatFieldName(k)}: ${v ?? 'N/A'}`)
+      .join(', ')
+  }
+
+  // Helper: render an array of objects as sub-cards with index labels
+  const renderArrayOfObjects = (arr, parentLabel) => {
+    return arr.map((item, idx) => (
+      <div key={idx} className="entity-sub-card">
+        <div className="sub-card-label">{parentLabel} {idx + 1}</div>
+        <div className="field-grid">
+          {Object.entries(item).map(([key, value]) => (
+            <div key={key} className="field-row">
+              <div className="field-label">{formatFieldName(key)}</div>
+              <div className={`field-value ${!value && value !== 0 ? 'empty' : ''}`}>
+                {renderValue(value) || 'N/A'}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    ))
+  }
+
+  // Categorize entity entries into nested objects, arrays-of-objects, and flat values
+  const categorizeEntries = () => {
+    const nestedEntries = []       // { key: { ... } }
+    const arrayObjEntries = []     // { key: [ {...}, {...} ] }
+    const flatEntries = []         // key: primitive or primitive-array
+    Object.entries(entities).forEach(([key, value]) => {
+      if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object' && value[0] !== null) {
+        arrayObjEntries.push([key, value])
+      } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+        nestedEntries.push([key, value])
+      } else {
+        flatEntries.push([key, value])
+      }
+    })
+    return { nestedEntries, arrayObjEntries, flatEntries }
   }
 
   const renderEntities = () => {
@@ -51,24 +123,70 @@ export default function Results({ uploadedDoc }) {
       )
     }
 
-    return Object.entries(entities).map(([category, fields]) => {
-      if (typeof fields !== 'object' || fields === null) return null
+    if (!entities || Object.keys(entities).length === 0) {
       return (
-        <div key={category} className="entity-card">
-          <div className="card-title">{category}</div>
-          <div className="field-grid">
-            {Object.entries(fields).map(([key, value]) => (
-              <div key={key} className="field-row">
-                <div className="field-label">{formatFieldName(key)}</div>
-                <div className={`field-value ${!value ? 'empty' : ''}`}>
-                  {value || 'N/A'}
-                </div>
-              </div>
-            ))}
-          </div>
+        <div className="entity-card">
+          <div className="card-title">No Entities Found</div>
+          <p style={{ color: '#6B7280', padding: '16px' }}>No structured data could be extracted from this document.</p>
         </div>
       )
-    })
+    }
+
+    const { nestedEntries, arrayObjEntries, flatEntries } = categorizeEntries()
+
+    return (
+      <>
+        {/* Flat key-value pairs */}
+        {flatEntries.length > 0 && (
+          <div className="entity-card">
+            <div className="card-title">Extracted Information</div>
+            <div className="field-grid">
+              {flatEntries.map(([key, value]) => (
+                <div key={key} className="field-row">
+                  <div className="field-label">{formatFieldName(key)}</div>
+                  <div className={`field-value ${!value && value !== 0 ? 'empty' : ''}`}>
+                    {renderValue(value) || 'N/A'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {/* Nested category objects */}
+        {nestedEntries.map(([category, fields]) => (
+          <div key={category} className="entity-card">
+            <div className="card-title">{category}</div>
+            <div className="field-grid">
+              {Object.entries(fields).map(([key, value]) => {
+                // If this nested field itself is an array of objects, render sub-cards
+                if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object') {
+                  return (
+                    <div key={key} className="field-row-full">
+                      {renderArrayOfObjects(value, formatFieldName(key))}
+                    </div>
+                  )
+                }
+                return (
+                  <div key={key} className="field-row">
+                    <div className="field-label">{formatFieldName(key)}</div>
+                    <div className={`field-value ${!value && value !== 0 ? 'empty' : ''}`}>
+                      {renderValue(value) || 'N/A'}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+        {/* Array-of-objects entries (e.g. Taxpayer Information: [{...}, {...}]) */}
+        {arrayObjEntries.map(([category, arr]) => (
+          <div key={category} className="entity-card">
+            <div className="card-title">{category}</div>
+            {renderArrayOfObjects(arr, formatFieldName(category).replace(/s$/, ''))}
+          </div>
+        ))}
+      </>
+    )
   }
 
   const renderTable = () => {
@@ -79,6 +197,58 @@ export default function Results({ uploadedDoc }) {
         </div>
       )
     }
+
+    if (!entities || Object.keys(entities).length === 0) {
+      return (
+        <div className="entity-card">
+          <p style={{ color: '#6B7280', padding: '16px' }}>No structured data could be extracted.</p>
+        </div>
+      )
+    }
+
+    // Flatten all entities into table rows: { category, field, value }
+    const rows = []
+    const { nestedEntries, arrayObjEntries, flatEntries } = categorizeEntries()
+
+    if (flatEntries.length > 0) {
+      flatEntries.forEach(([key, value]) => {
+        rows.push({ category: 'General', field: key, value: renderValue(value) || 'N/A' })
+      })
+    }
+
+    nestedEntries.forEach(([category, fields]) => {
+      Object.entries(fields).forEach(([key, value]) => {
+        if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object') {
+          value.forEach((item, idx) => {
+            Object.entries(item).forEach(([k, v]) => {
+              rows.push({ category: `${category} - ${formatFieldName(key)} ${idx + 1}`, field: k, value: renderValue(v) || 'N/A' })
+            })
+          })
+        } else {
+          rows.push({ category, field: key, value: renderValue(value) || 'N/A' })
+        }
+      })
+    })
+
+    arrayObjEntries.forEach(([category, arr]) => {
+      arr.forEach((item, idx) => {
+        Object.entries(item).forEach(([key, value]) => {
+          rows.push({ category: `${category} ${idx + 1}`, field: key, value: renderValue(value) || 'N/A' })
+        })
+      })
+    })
+
+    // Group rows by category for rowSpan
+    const grouped = []
+    let lastCat = null
+    rows.forEach((row) => {
+      if (row.category !== lastCat) {
+        grouped.push({ ...row, span: rows.filter(r => r.category === row.category).length, showCat: true })
+        lastCat = row.category
+      } else {
+        grouped.push({ ...row, showCat: false })
+      }
+    })
 
     return (
       <div className="entity-card">
@@ -91,20 +261,15 @@ export default function Results({ uploadedDoc }) {
             </tr>
           </thead>
           <tbody>
-            {Object.entries(entities).map(([category, fields]) => {
-              if (typeof fields !== 'object' || fields === null) return null
-              return Object.entries(fields).map(([key, value], idx) => (
-                <tr key={`${category}-${key}`}>
-                  {idx === 0 && (
-                    <td rowSpan={Object.keys(fields).length} className="category-cell">
-                      {category}
-                    </td>
-                  )}
-                  <td>{formatFieldName(key)}</td>
-                  <td>{value || 'N/A'}</td>
-                </tr>
-              ))
-            })}
+            {grouped.map((row, idx) => (
+              <tr key={idx}>
+                {row.showCat && (
+                  <td rowSpan={row.span} className="category-cell">{row.category}</td>
+                )}
+                <td>{formatFieldName(row.field)}</td>
+                <td>{row.value}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -118,14 +283,18 @@ export default function Results({ uploadedDoc }) {
           <Link to="/" className="breadcrumb-link">Home</Link>
           <span className="breadcrumb-separator">/</span>
           <span>Results</span>
-          <span className="breadcrumb-separator">/</span>
-          <span>{result.file_name}</span>
+          {!isDualDoc && (
+            <>
+              <span className="breadcrumb-separator">/</span>
+              <span>{fileName}</span>
+            </>
+          )}
         </div>
       </div>
 
       <div className="document-header">
         <div className="document-title">
-          <h1>{result.file_name}</h1>
+          <h1>{isDualDoc ? 'Dual Document Analysis' : fileName}</h1>
           <div className="document-meta">
             Processed with {modelLabel}
           </div>
@@ -143,6 +312,31 @@ export default function Results({ uploadedDoc }) {
           </button>
         </div>
       </div>
+
+      {isDualDoc && (
+        <div className="document-tabs">
+          <button
+            className={`doc-tab ${activeDoc === 'loan' ? 'active' : ''}`}
+            onClick={() => setActiveDoc('loan')}
+          >
+            <span className="doc-tab-icon loan">1</span>
+            <span className="doc-tab-label">
+              <div className="doc-tab-title">Loan Application</div>
+              <div className="doc-tab-subtitle">{result.documents.loan.file_name}</div>
+            </span>
+          </button>
+          <button
+            className={`doc-tab ${activeDoc === 'tax' ? 'active' : ''}`}
+            onClick={() => setActiveDoc('tax')}
+          >
+            <span className="doc-tab-icon tax">2</span>
+            <span className="doc-tab-label">
+              <div className="doc-tab-title">Tax Return</div>
+              <div className="doc-tab-subtitle">{result.documents.tax.file_name}</div>
+            </span>
+          </button>
+        </div>
+      )}
 
       <main className="results-main">
         <div className="entity-panel">
@@ -171,12 +365,12 @@ export default function Results({ uploadedDoc }) {
 
         <div className="pdf-panel">
           <div className="pdf-controls">
-            <div className="page-info">Document Preview</div>
+            <div className="page-info">{isDualDoc ? (activeDoc === 'loan' ? 'Loan Document Preview' : 'Tax Document Preview') : 'Document Preview'}</div>
           </div>
           <div className="pdf-viewer">
-            {result.file_url ? (
+            {fileUrl ? (
               <iframe
-                src={result.file_url}
+                src={fileUrl}
                 title="PDF Viewer"
                 className="pdf-iframe"
               />

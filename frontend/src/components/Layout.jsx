@@ -28,7 +28,13 @@ export default function Layout({ children, onLogout, uploadedDoc }) {
       <div className="main-content">
         {children}
       </div>
-      {uploadedDoc && <Chatbot documentText={uploadedDoc.extractedText || ''} />}
+      {uploadedDoc && (
+        <Chatbot 
+          documentText={uploadedDoc.extractedText || ''} 
+          loanText={uploadedDoc.loanText || ''}
+          taxText={uploadedDoc.taxText || ''}
+        />
+      )}
     </div>
   )
 }

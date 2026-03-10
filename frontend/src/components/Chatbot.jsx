@@ -1,16 +1,22 @@
 import { useState, useRef, useEffect } from 'react'
 import { MessageCircle, X, Send } from 'lucide-react'
 import axios from 'axios'
+import ReactMarkdown from 'react-markdown'
 import './Chatbot.css'
 
-export default function Chatbot({ documentText }) {
+export default function Chatbot({ documentText, loanText, taxText }) {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Hello! I can answer questions about the uploaded document. What would you like to know?' }
+    { role: 'assistant', content: loanText && taxText ? 
+      'Hello! I can answer questions about your loan application and tax return documents. What would you like to know?' : 
+      'Hello! I can answer questions about the uploaded document. What would you like to know?' 
+    }
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const messagesEndRef = useRef(null)
+
+  const hasDualDocs = loanText && taxText
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -26,11 +32,20 @@ export default function Chatbot({ documentText }) {
     setLoading(true)
 
     try {
-      const response = await axios.post('/api/chat/', {
+      const requestBody = {
         message: trimmed,
-        document_text: documentText,
         history: messages.slice(-10),
-      })
+      }
+      
+      // Pass appropriate document text based on what's available
+      if (hasDualDocs) {
+        requestBody.loan_text = loanText
+        requestBody.tax_text = taxText
+      } else {
+        requestBody.document_text = documentText
+      }
+
+      const response = await axios.post('/api/chat/', requestBody)
 
       setMessages((prev) => [
         ...prev,
@@ -71,7 +86,7 @@ export default function Chatbot({ documentText }) {
           <div className="chatbot-header">
             <div className="chatbot-header-info">
               <MessageCircle size={20} />
-              <span>Document Assistant</span>
+              <span>{hasDualDocs ? 'Dual Document Assistant' : 'Document Assistant'}</span>
             </div>
             <button className="chatbot-close" onClick={() => setIsOpen(false)} aria-label="Close chatbot">
               <X size={18} />
@@ -81,7 +96,13 @@ export default function Chatbot({ documentText }) {
           <div className="chatbot-messages">
             {messages.map((msg, idx) => (
               <div key={idx} className={`chatbot-msg ${msg.role}`}>
-                <div className="chatbot-msg-bubble">{msg.content}</div>
+                <div className="chatbot-msg-bubble">
+                  {msg.role === 'assistant' ? (
+                    <div className="markdown-content"><ReactMarkdown>{String(msg.content || '')}</ReactMarkdown></div>
+                  ) : (
+                    msg.content
+                  )}
+                </div>
               </div>
             ))}
             {loading && (

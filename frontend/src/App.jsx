@@ -19,7 +19,7 @@ function App() {
 
   useEffect(() => {
     if (uploadedDoc) {
-      const { file, ...serializableDoc } = uploadedDoc
+      const { file, loanFile, taxFile, ...serializableDoc } = uploadedDoc
       sessionStorage.setItem('uploadedDoc', JSON.stringify(serializableDoc))
     } else {
       sessionStorage.removeItem('uploadedDoc')
