@@ -1,10 +1,84 @@
-.login-page {
+.landing-page {
   min-height: 100vh;
+  display: flex;
+}
+
+.landing-left {
+  flex: 1;
+  background: linear-gradient(135deg, #1E3A5F 0%, #1E40AF 50%, #3B82F6 100%);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 64px;
+}
+
+.landing-brand {
+  margin-bottom: 48px;
+}
+
+.landing-logo {
+  width: 72px;
+  height: 72px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #EFF6FF 0%, #F9FAFB 50%, #EFF6FF 100%);
-  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.landing-title {
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 16px;
+  letter-spacing: -0.02em;
+}
+
+.landing-description {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.6;
+  max-width: 480px;
+}
+
+.landing-features {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.landing-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.landing-feature svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.landing-feature h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.landing-feature p {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.5;
+}
+
+.landing-right {
+  flex: 0 0 480px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #F9FAFB;
+  padding: 32px;
 }
 
 .login-card {
@@ -19,17 +93,6 @@
 .login-header {
   text-align: center;
   margin-bottom: 32px;
-}
-
-.login-icon {
-  width: 64px;
-  height: 64px;
-  background: #EFF6FF;
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 16px;
 }
 
 .login-title {
@@ -106,6 +169,25 @@
 .login-button:hover {
   background: #2563EB;
   transform: scale(1.02);
+}
+
+@media (max-width: 960px) {
+  .landing-page {
+    flex-direction: column;
+  }
+
+  .landing-left {
+    padding: 40px 24px;
+  }
+
+  .landing-title {
+    font-size: 28px;
+  }
+
+  .landing-right {
+    flex: none;
+    padding: 24px;
+  }
 }
 
 @media (max-width: 480px) {
