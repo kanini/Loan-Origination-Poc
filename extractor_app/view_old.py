@@ -55,7 +55,7 @@ def extract_view(request):
                         model="gpt-3.5-turbo",
                         messages=[{"role": "user", "content": prompt}],
                         temperature=0.2,
-                        max_tokens=500,
+                        max_completion_tokens=500,
                     )
                     model_output = response.choices[0].message['content']
 

@@ -1,0 +1,145 @@
+.processing-main {
+  padding: 48px 32px;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  min-height: calc(100vh - 200px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner {
+  width: 80px;
+  height: 80px;
+  border: 6px solid #E5E7EB;
+  border-top-color: #3B82F6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 32px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.processing-main h2 {
+  font-size: 30px;
+  font-weight: 600;
+  color: #1F2937;
+  margin-bottom: 24px;
+  text-align: center;
+  letter-spacing: -0.01em;
+}
+
+.processing-details {
+  background: white;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  padding: 24px;
+  width: 100%;
+  max-width: 500px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid #F3F4F6;
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  font-size: 14px;
+  color: #6B7280;
+  font-weight: 500;
+}
+
+.detail-value {
+  font-size: 14px;
+  color: #111827;
+  font-weight: 600;
+}
+
+.subtext {
+  font-size: 14px;
+  color: #6B7280;
+  text-align: center;
+  margin-top: 16px;
+}
+
+.error-icon {
+  color: #EF4444;
+  margin-bottom: 32px;
+}
+
+.error-message-text {
+  font-size: 16px;
+  color: #6B7280;
+  text-align: center;
+  margin-bottom: 24px;
+  max-width: 400px;
+}
+
+.error-details {
+  background: #FEF2F2;
+  border: 1px solid #FEE2E2;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+  font-size: 14px;
+  color: #991B1B;
+  max-width: 500px;
+  width: 100%;
+  word-break: break-word;
+}
+
+.success-icon {
+  margin-bottom: 32px;
+}
+
+.proc-action-buttons {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.button-tertiary {
+  background: transparent;
+  color: #6B7280;
+  border: none;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.button-tertiary:hover {
+  color: #374151;
+  text-decoration: underline;
+}
+
+@media (max-width: 767px) {
+  .processing-main {
+    padding: 24px 16px;
+  }
+
+  .processing-main h2 {
+    font-size: 24px;
+  }
+
+  .proc-action-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .proc-action-buttons .button {
+    width: 100%;
+  }
+}
