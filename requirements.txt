@@ -48,7 +48,7 @@ multidict==6.1.0
 mypy-extensions==1.0.0
 numpy==1.26.4
 oauthlib==3.2.2
-orjson==3.10.10
+orjson==3.11.6
 openai==0.28
 packaging==24.1
 pdf2image==1.17.0
